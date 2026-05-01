@@ -12,7 +12,7 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --g1:#1a3d1a;--g2:#2a5e2a;--g3:#3d8b3d;--g4:#5cb85c;
+  --g1:#3b4a2f;--g2:#4a5e38;--g3:#5a7245;--g4:#7a9c5a;
   --gold:#c9a227;--goldf:#f0c240;
   --red:#e53935;--blue:#1e88e5;--purple:#7e57c2;--orange:#fb8c00;
   --white:#fff;--text:#f0f0f0;--sub:rgba(255,255,255,.5);
@@ -160,11 +160,11 @@ table.sc tr:nth-child(even) .lbl{background:#1a3a1a}
     <div class="home-btns">
       <button class="hbtn golf" onclick="selType('full')">
         <span class="bi">🏌️</span>
-        <div class="bt"><b>Camp Gran</b><span>18 forats · Stroke Play · Stableford</span></div>
+        <div class="bt"><b>Golf</b></div>
       </button>
       <button class="hbtn pp" onclick="selType('pp')">
         <span class="bi">🎯</span>
-        <div class="bt"><b>Pitch &amp; Putt</b><span>P&amp;P · Par 3 · Camps curts</span></div>
+        <div class="bt"><b>Pitch &amp; Putt</b></div>
       </button>
     </div>
   </div></div>
@@ -223,7 +223,7 @@ function go(to,from,back=false){
 // HOME → COURSE SELECT
 function selType(type){
   const list=GOLF_DATA.filter(c=>c.type===type);
-  document.getElementById('cs-title').textContent=type==='full'?'Camp Gran':'Pitch & Putt';
+  document.getElementById('cs-title').textContent=type==='full'?'Golf':'Pitch & Putt';
   document.getElementById('cs-sub').textContent=list.length+' camps disponibles';
   document.getElementById('clist').innerHTML=list.map(c=>`
     <div class="citem" onclick="openCourse('${enc(c.name)}')">
