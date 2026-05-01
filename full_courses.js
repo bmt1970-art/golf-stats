@@ -621,12 +621,5 @@ const FULL_COURSES = {
     ]
   },
 
-  // Portal del Roc: no trobat al registre RFEG
-  "Portal del Roc": {
-    logo: "",
-    web:  "",
-    phone:"",
-    holes:[]
-  },
 
 };

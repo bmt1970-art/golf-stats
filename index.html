@@ -398,7 +398,7 @@ function renderHole(){
   document.getElementById('sgrid').innerHTML=html;
 }
 
-function enc(s){return encodeURIComponent(s)}
+function enc(s){return encodeURIComponent(s).replace(/'/g,'%27')}
 function fmtDate(d){
   if(!d) return '';
   const [y,m,dy]=d.split('-');

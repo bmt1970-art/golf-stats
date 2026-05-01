@@ -841,4 +841,10 @@ const SCORECARDS = {
     holes: []
   },
 
+  "Portal del Roc": {
+    web: "", phone: "",
+    // PENDENT: sense dades oficials de forats
+    holes: []
+  },
+
 };
