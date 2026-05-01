@@ -843,8 +843,26 @@ const SCORECARDS = {
 
   "Portal del Roc": {
     web: "", phone: "",
-    // PENDENT: sense dades oficials de forats
-    holes: []
+    holes:[
+      {h:1,  par:3, si:18},
+      {h:2,  par:3, si:16},
+      {h:3,  par:3, si:2},
+      {h:4,  par:3, si:4},
+      {h:5,  par:3, si:6},
+      {h:6,  par:3, si:14},
+      {h:7,  par:3, si:12},
+      {h:8,  par:3, si:8},
+      {h:9,  par:3, si:10},
+      {h:10, par:3, si:17},
+      {h:11, par:3, si:15},
+      {h:12, par:3, si:9},
+      {h:13, par:3, si:13},
+      {h:14, par:3, si:5},
+      {h:15, par:3, si:7},
+      {h:16, par:3, si:1},
+      {h:17, par:3, si:11},
+      {h:18, par:3, si:3},
+    ]
   },
 
 };
