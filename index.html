@@ -19,7 +19,7 @@
   --card:rgba(255,255,255,.07);--border:rgba(255,255,255,.1);
   --r:14px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)
 }
-html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--g1);color:var(--text);overflow:hidden}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--g1);color:#1a3a1a;overflow:hidden}
 
 /* SCREENS */
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;padding-top:var(--st);padding-bottom:var(--sb);background:var(--g1);transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .25s}
@@ -227,7 +227,7 @@ function selType(type){
   document.getElementById('cs-sub').textContent=list.length+' camps disponibles';
   document.getElementById('clist').innerHTML=list.map(c=>`
     <div class="citem" onclick="openCourse('${enc(c.name)}')">
-      <div><div class="cn">${c.name}</div><div class="cm">${c.rounds} partida${c.rounds!==1?'des':''}</div></div>
+      <div><div class="cn">${c.name}</div><div class="cm">${c.rounds} partide${c.rounds!==1?'s':''}</div></div>
       <div class="ca">&#8250;</div>
     </div>`).join('');
   go('s-courses','s-home');
@@ -238,7 +238,7 @@ function openCourse(encoded){
   curCourse=GOLF_DATA.find(c=>c.name===decodeURIComponent(encoded));
   if(!curCourse) return;
   document.getElementById('rl-title').textContent=curCourse.name;
-  document.getElementById('rl-sub').textContent=curCourse.rounds+' partida'+(curCourse.rounds!==1?'des':'');
+  document.getElementById('rl-sub').textContent=curCourse.rounds+' partide'+(curCourse.rounds!==1?'s':'');
   document.getElementById('rlist').innerHTML=curCourse.roundsList.map(r=>buildCard(r)).join('');
 
   // Logo + web + telèfon
@@ -384,6 +384,9 @@ function renderHole(){
     const c=hd.girPct>=50?'#66bb6a':hd.girPct>=25?'#ffa726':'#ef5350';
     html+=`<div class="scard"><div class="sl">🎯 GIR</div><div class="sv" style="color:${c}">${hd.girPct}%</div><div class="ss">Green en regulacio</div></div>`;
   }
+  // PENALTIES & SAND
+  if(hd.avgPenalties!=null&&hd.avgPenalties>0) html+=`<div class="scard"><div class="sl">⚠️ Penalitzacions</div><div class="sv">${hd.avgPenalties}</div><div class="ss">Mitjana per ronda</div></div>`;
+  if(hd.avgSand!=null&&hd.avgSand>0) html+=`<div class="scard"><div class="sl">🏖️ Sortides Sorra</div><div class="sv">${hd.avgSand}</div><div class="ss">Mitjana per ronda</div></div>`;
   // DISTRIBUTION
   if(hd.scoreDist&&hd.rounds>0){
     const dt=hd.scoreDist,tot=hd.rounds;
