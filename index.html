@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Golf Stats">
+<meta name="theme-color" content="#1a3d1a">
+<link rel="manifest" href="manifest.json">
+<title>Golf Stats</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --g1:#1a3d1a;--g2:#2a5e2a;--g3:#3d8b3d;--g4:#5cb85c;
+  --gold:#c9a227;--goldf:#f0c240;
+  --red:#e53935;--blue:#1e88e5;--purple:#7e57c2;--orange:#fb8c00;
+  --white:#fff;--text:#f0f0f0;--sub:rgba(255,255,255,.5);
+  --card:rgba(255,255,255,.07);--border:rgba(255,255,255,.1);
+  --r:14px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--g1);color:var(--text);overflow:hidden}
+
+/* SCREENS */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;padding-top:var(--st);padding-bottom:var(--sb);background:var(--g1);transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .25s}
+.screen.off-r{transform:translateX(100%);opacity:0;pointer-events:none}
+.screen.off-l{transform:translateX(-100%);opacity:0;pointer-events:none}
+
+/* HEADER */
+.hdr{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:12px 14px 11px;border-bottom:1px solid var(--border);min-height:60px}
+.hdr-info{flex:1;min-width:0}
+.hdr-info h2{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-info p{font-size:11px;color:var(--sub);margin-top:2px}
+.btn-ico{flex-shrink:0;height:40px;border-radius:12px;border:none;color:var(--white);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;padding:0 12px;-webkit-tap-highlight-color:transparent}
+.btn-ico.back{width:40px;padding:0;background:rgba(255,255,255,.1);font-size:20px}
+.btn-ico.back:active,.btn-ico:active{opacity:.65}
+.btn-ico.action{background:var(--g3);white-space:nowrap}
+
+/* SCROLL */
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ── HOME ── */
+#s-home .inner{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px}
+.logo{text-align:center;margin-bottom:44px}
+.logo .ic{font-size:60px}
+.logo h1{font-size:28px;font-weight:800;margin-top:8px}
+.logo p{font-size:13px;color:var(--sub);margin-top:5px}
+.home-btns{display:flex;flex-direction:column;gap:14px;width:100%;max-width:360px}
+.hbtn{display:flex;align-items:center;gap:16px;padding:20px 22px;border-radius:18px;border:none;cursor:pointer;color:#fff;-webkit-tap-highlight-color:transparent;transition:transform .1s}
+.hbtn:active{transform:scale(.97)}
+.hbtn.golf{background:linear-gradient(135deg,#2a5e2a,#3d8b3d)}
+.hbtn.pp{background:linear-gradient(135deg,#1565c0,#1e88e5)}
+.hbtn .bi{font-size:34px;flex-shrink:0}
+.hbtn .bt{text-align:left}
+.hbtn .bt b{font-size:19px;font-weight:700;display:block}
+.hbtn .bt span{font-size:12px;opacity:.65;margin-top:2px;display:block}
+
+/* ── COURSE LIST ── */
+.clist{padding:10px 14px;display:flex;flex-direction:column;gap:8px}
+.citem{display:flex;align-items:center;gap:12px;padding:14px 15px;background:var(--card);border-radius:var(--r);border:1px solid var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.citem:active{background:rgba(255,255,255,.14)}
+.citem .cn{font-size:15px;font-weight:600;flex:1}
+.citem .cm{font-size:11px;color:var(--sub);margin-top:3px}
+.citem .ca{font-size:18px;color:var(--sub)}
+
+/* ── ROUND LIST ── */
+.rlist{padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+
+.rcard{background:var(--card);border-radius:var(--r);border:1px solid var(--border);overflow:hidden}
+
+/* Round header row */
+.rhead{display:flex;align-items:center;gap:8px;padding:10px 12px 8px}
+.rdate{font-size:15px;font-weight:700;flex:1}
+.rhcp{background:rgba(255,255,255,.12);border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700}
+
+/* Score totals row */
+.rtotals{display:flex;gap:6px;padding:0 12px 10px;border-bottom:1px solid var(--border)}
+.rpill{display:flex;flex-direction:column;align-items:center;background:rgba(0,0,0,.2);border-radius:8px;padding:5px 10px;min-width:56px}
+.rpill .rv{font-size:17px;font-weight:800;line-height:1}
+.rpill .rl{font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--sub);margin-top:2px;text-transform:uppercase}
+.rpill.pts .rv{color:var(--goldf)}
+.rpill.net .rv{color:#81d4fa}
+
+/* Scorecard table */
+.sc-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px 0 8px}
+table.sc{border-collapse:collapse;font-size:11px;white-space:nowrap}
+table.sc td,table.sc th{padding:0;height:26px;text-align:center;vertical-align:middle}
+/* sticky label column */
+table.sc .lbl{position:sticky;left:0;background:#1f3f1f;z-index:2;padding:0 7px 0 10px;font-size:10px;font-weight:700;color:var(--sub);letter-spacing:.4px;text-align:left;white-space:nowrap;min-width:36px}
+/* hole number cells */
+table.sc .hnum{font-size:10px;font-weight:600;color:var(--sub);width:26px;min-width:26px}
+/* par cells */
+table.sc .hpar{font-size:11px;font-weight:600;color:rgba(255,255,255,.65);width:26px}
+/* distance cells */
+table.sc .hdist{font-size:10px;color:rgba(255,255,255,.5);width:26px}
+/* score cells */
+table.sc .sc-cell{width:26px;min-width:26px;border-radius:5px;font-size:12px;font-weight:700}
+table.sc .eagle{background:#7e57c2;color:#fff}
+table.sc .birdie{background:#2e7d32;color:#fff}
+table.sc .par{background:#1565c0;color:#fff}
+table.sc .bogey{background:#bf360c;color:#fff}
+table.sc .dbl{background:#b71c1c;color:#fff}
+table.sc .worse{background:#4a0000;color:#fff}
+table.sc .miss{color:var(--sub)}
+/* separator between 9 and 10 */
+table.sc .sep{width:6px;min-width:6px;background:rgba(255,255,255,.12);border-radius:3px}
+/* row alternation */
+table.sc tr:nth-child(even) .lbl{background:#1a3a1a}
+
+/* ── COURSE INFO BAR (logo + links) ── */
+.course-info-bar{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(0,0,0,.25);border-bottom:1px solid var(--border)}
+.course-logo{height:46px;width:auto;max-width:76px;object-fit:contain;border-radius:7px;background:rgba(255,255,255,.95);padding:4px;flex-shrink:0}
+.course-links{display:flex;flex-wrap:wrap;gap:4px 14px}
+.course-links a{color:var(--goldf);font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+
+/* ── HOLE STATS (forat a forat) ── */
+.hole-nav{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
+.nav-btn{height:50px;width:80px;border:none;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.nav-btn:active{background:var(--g3)}
+.nav-btn:disabled{opacity:.25;pointer-events:none}
+.hole-title{text-align:center}
+.hole-title .hn{font-size:32px;font-weight:800;line-height:1}
+.hole-title .hp{font-size:13px;color:var(--sub);margin-top:2px}
+.dots{display:flex;gap:4px;justify-content:center;padding:2px 0 8px;flex-shrink:0}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2)}
+.dot.on{background:var(--g4);width:16px;border-radius:3px}
+.sgrid{padding:0 12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.scard{background:var(--card);border-radius:var(--r);padding:13px;border:1px solid var(--border)}
+.scard.w2{grid-column:1/-1}
+.sl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sub);margin-bottom:9px}
+.sv{font-size:26px;font-weight:800;line-height:1}
+.ss{font-size:11px;color:var(--sub);margin-top:4px}
+.cr{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.cr:last-child{margin-bottom:0}
+.cbadge{background:var(--g3);color:#fff;font-size:15px;font-weight:800;padding:6px 11px;border-radius:9px;min-width:60px;text-align:center}
+.cbadge.gold{background:var(--gold);color:#1a1a1a}
+.ci{flex:1}.ci .ct{font-size:10px;color:var(--sub);font-weight:700;letter-spacing:.5px}.ci .cd{font-size:13px;font-weight:600;margin-top:1px}
+.dr{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.dr:last-child{margin-bottom:0}
+.dl{font-size:11px;font-weight:700;width:46px;flex-shrink:0}
+.db{flex:1;height:19px;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden}
+.dbf{height:100%;border-radius:5px}
+.dn{font-size:11px;font-weight:700;width:18px;text-align:right}
+.dp{font-size:10px;width:28px;text-align:right;color:var(--sub)}
+.bar-eagle{background:#7e57c2}.bar-birdie{background:#2e7d32}.bar-par{background:#1565c0}
+.bar-bogey{background:#bf360c}.bar-double{background:#b71c1c}.bar-worse{background:#4a0000}
+.nodata{grid-column:1/-1;text-align:center;padding:32px 20px;color:var(--sub);font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- ══ HOME ══ -->
+<div id="s-home" class="screen">
+  <div class="scroll"><div class="inner">
+    <div class="logo">
+      <div class="ic">⛳</div>
+      <h1>Golf Stats</h1>
+      <p>Les meves estadistiques per forat</p>
+    </div>
+    <div class="home-btns">
+      <button class="hbtn golf" onclick="selType('full')">
+        <span class="bi">🏌️</span>
+        <div class="bt"><b>Camp Gran</b><span>18 forats · Stroke Play · Stableford</span></div>
+      </button>
+      <button class="hbtn pp" onclick="selType('pp')">
+        <span class="bi">🎯</span>
+        <div class="bt"><b>Pitch &amp; Putt</b><span>P&amp;P · Par 3 · Camps curts</span></div>
+      </button>
+    </div>
+  </div></div>
+</div>
+
+<!-- ══ COURSE SELECT ══ -->
+<div id="s-courses" class="screen off-r">
+  <div class="hdr">
+    <button class="btn-ico back" onclick="go('s-home','s-courses',true)">&#8249;</button>
+    <div class="hdr-info"><h2 id="cs-title"></h2><p id="cs-sub"></p></div>
+  </div>
+  <div class="scroll"><div class="clist" id="clist"></div></div>
+</div>
+
+<!-- ══ ROUND LIST ══ -->
+<div id="s-rounds" class="screen off-r">
+  <div class="hdr">
+    <button class="btn-ico back" onclick="go('s-courses','s-rounds',true)">&#8249;</button>
+    <div class="hdr-info"><h2 id="rl-title"></h2><p id="rl-sub"></p></div>
+    <button class="btn-ico action" onclick="openHoleStats()">⛳ Forat a forat</button>
+  </div>
+  <div class="course-info-bar" id="course-info-bar" style="display:none"></div>
+  <div class="scroll"><div class="rlist" id="rlist"></div></div>
+</div>
+
+<!-- ══ HOLE STATS ══ -->
+<div id="s-stats" class="screen off-r">
+  <div class="hdr">
+    <button class="btn-ico back" onclick="go('s-rounds','s-stats',true)">&#8249;</button>
+    <div class="hdr-info"><h2 id="st-title"></h2></div>
+  </div>
+  <div class="hole-nav">
+    <button class="nav-btn" id="btn-prev" onclick="chH(-1)">&#8249; ANT</button>
+    <div class="hole-title"><div class="hn" id="st-hn"></div><div class="hp" id="st-hp"></div></div>
+    <button class="nav-btn" id="btn-next" onclick="chH(1)">SEG &#8250;</button>
+  </div>
+  <div class="dots" id="dots"></div>
+  <div class="scroll"><div class="sgrid" id="sgrid"></div></div>
+</div>
+
+<script src="data.js"></script>
+<script src="scorecards.js"></script>
+<script src="full_courses.js"></script>
+<script>
+let curCourse=null, curHole=1;
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+function go(to,from,back=false){
+  const t=document.getElementById(to),f=document.getElementById(from);
+  t.classList.remove('off-r','off-l');
+  f.classList.add(back?'off-r':'off-l');
+  setTimeout(()=>{f.classList.remove('off-l')},330);
+}
+
+// HOME → COURSE SELECT
+function selType(type){
+  const list=GOLF_DATA.filter(c=>c.type===type);
+  document.getElementById('cs-title').textContent=type==='full'?'Camp Gran':'Pitch & Putt';
+  document.getElementById('cs-sub').textContent=list.length+' camps disponibles';
+  document.getElementById('clist').innerHTML=list.map(c=>`
+    <div class="citem" onclick="openCourse('${enc(c.name)}')">
+      <div><div class="cn">${c.name}</div><div class="cm">${c.rounds} partida${c.rounds!==1?'des':''}</div></div>
+      <div class="ca">&#8250;</div>
+    </div>`).join('');
+  go('s-courses','s-home');
+}
+
+// COURSE SELECT → ROUND LIST
+function openCourse(encoded){
+  curCourse=GOLF_DATA.find(c=>c.name===decodeURIComponent(encoded));
+  if(!curCourse) return;
+  document.getElementById('rl-title').textContent=curCourse.name;
+  document.getElementById('rl-sub').textContent=curCourse.rounds+' partida'+(curCourse.rounds!==1?'des':'');
+  document.getElementById('rlist').innerHTML=curCourse.roundsList.map(r=>buildCard(r)).join('');
+
+  // Logo + web + telèfon
+  const db=(typeof SCORECARDS!=='undefined'&&SCORECARDS[curCourse.name])||(typeof FULL_COURSES!=='undefined'&&FULL_COURSES[curCourse.name])||null;
+  const bar=document.getElementById('course-info-bar');
+  if(db&&(db.logo||db.web||db.phone)){
+    let h='';
+    if(db.logo) h+=`<img class="course-logo" src="${db.logo}" onerror="this.style.display='none'" alt="">`;
+    let links='';
+    if(db.web) links+=`<a href="${db.web}" target="_blank" rel="noopener">🌐 Web</a>`;
+    if(db.phone) links+=`<a href="tel:${db.phone}">📞 ${db.phone}</a>`;
+    if(links) h+=`<div class="course-links">${links}</div>`;
+    bar.innerHTML=h; bar.style.display='flex';
+  } else {
+    bar.innerHTML=''; bar.style.display='none';
+  }
+
+  go('s-rounds','s-courses');
+}
+
+function buildCard(r){
+  const dateTxt=fmtDate(r.date);
+  const hcpHtml=r.hcp!=null?`<div class="rhcp">HCP ${r.hcp}</div>`:'';
+  let pillsHtml=`<div class="rpill"><div class="rv">${r.gross??'-'}</div><div class="rl">Brut</div></div>`;
+  if(r.net!=null)  pillsHtml+=`<div class="rpill net"><div class="rv">${r.net}</div><div class="rl">Net</div></div>`;
+  if(r.pts!=null)  pillsHtml+=`<div class="rpill pts"><div class="rv">${r.pts}</div><div class="rl">Stableford</div></div>`;
+  const scHtml=buildSC(r.hScores);
+  return `<div class="rcard">
+    <div class="rhead"><div class="rdate">📅 ${dateTxt}</div>${hcpHtml}</div>
+    <div class="rtotals">${pillsHtml}</div>
+    ${scHtml}
+  </div>`;
+}
+
+function buildSC(hScores){
+  if(!hScores||hScores.every(s=>s==null)) return '';
+  const holes=curCourse.holes;
+  const sc=(typeof SCORECARDS!=='undefined'&&SCORECARDS[curCourse.name])||(typeof FULL_COURSES!=='undefined'&&FULL_COURSES[curCourse.name])||null;
+
+  let rNum='<tr><th class="lbl">Forat</th>';
+  let rPar='<tr><th class="lbl">Par</th>';
+  let rDst='<tr><th class="lbl">Dist</th>';
+  let rHcp='<tr><th class="lbl">HCP</th>';
+  let rSco='<tr><th class="lbl">Brut</th>';
+
+  for(let i=1;i<=18;i++){
+    if(i===10){
+      rNum+='<td class="sep"></td>';
+      rPar+='<td class="sep"></td>';
+      rDst+='<td class="sep"></td>';
+      rHcp+='<td class="sep"></td>';
+      rSco+='<td class="sep"></td>';
+    }
+    const hd=holes[String(i)]||{};
+    const par=hd.par||0;
+    const scHole=sc?sc.holes.find(h=>h.h===i):null;
+    const dist=scHole&&scHole.dist!=null?scHole.dist:(hd.meters!=null?hd.meters:null);
+    const si=scHole&&scHole.si!=null?scHole.si:null;
+    const s=hScores[i-1];
+
+    rNum+=`<td class="hnum">${i}</td>`;
+    rPar+=`<td class="hpar">${par||'-'}</td>`;
+    rDst+=`<td class="hdist">${dist!=null?dist:'-'}</td>`;
+    rHcp+=`<td class="hdist">${si!=null?si:'-'}</td>`;
+    if(s==null){
+      rSco+=`<td class="sc-cell miss">-</td>`;
+    } else {
+      const cls=sCls(s,par);
+      rSco+=`<td class="sc-cell ${cls}">${s}</td>`;
+    }
+  }
+  rNum+='</tr>'; rPar+='</tr>'; rDst+='</tr>'; rHcp+='</tr>'; rSco+='</tr>';
+
+  return `<div class="sc-wrap"><table class="sc">
+    ${rNum}${rPar}${rDst}${rHcp}${rSco}
+  </table></div>`;
+}
+
+function sCls(s,par){
+  if(!par) return '';
+  const d=s-par;
+  if(d<=-2) return 'eagle';
+  if(d===-1) return 'birdie';
+  if(d===0)  return 'par';
+  if(d===1)  return 'bogey';
+  if(d===2)  return 'dbl';
+  return 'worse';
+}
+
+// HOLE STATS
+function openHoleStats(){
+  curHole=1;
+  document.getElementById('st-title').textContent=curCourse.name;
+  buildDots(); renderHole();
+  go('s-stats','s-rounds');
+}
+function chH(d){
+  const n=curHole+d;
+  if(n<1||n>18) return;
+  curHole=n; buildDots(); renderHole();
+}
+function buildDots(){
+  let h='';
+  for(let i=1;i<=18;i++) h+=`<div class="dot${i===curHole?' on':''}"></div>`;
+  document.getElementById('dots').innerHTML=h;
+}
+function renderHole(){
+  const hd=curCourse.holes[String(curHole)];
+  document.getElementById('btn-prev').disabled=curHole===1;
+  document.getElementById('btn-next').disabled=curHole===18;
+  document.getElementById('st-hn').textContent='Forat '+curHole;
+  if(!hd||hd.rounds===0){
+    document.getElementById('st-hp').textContent='';
+    document.getElementById('sgrid').innerHTML='<div class="nodata">Sense dades per a aquest forat</div>';
+    return;
+  }
+  const sc2=(typeof SCORECARDS!=='undefined'&&SCORECARDS[curCourse.name])||(typeof FULL_COURSES!=='undefined'&&FULL_COURSES[curCourse.name])||null;
+  const scH=sc2?sc2.holes.find(h=>h.h===curHole):null;
+  const offDist=scH&&scH.dist!=null?scH.dist:null;
+  const offSI=scH&&scH.si!=null?scH.si:null;
+  const dispDist=offDist!=null?offDist:hd.meters;
+  let subtitle=hd.par>0?'Par '+hd.par+(dispDist?' · '+dispDist+'m':'')+(offSI!=null?' · HCP '+offSI:''):'';
+  document.getElementById('st-hp').textContent=subtitle;
+  let html='';
+  // CLUBS
+  html+=`<div class="scard w2"><div class="sl">🏌️ Pal de Sortida</div>`;
+  if(hd.topClub||hd.bestClub){
+    if(hd.topClub) html+=`<div class="cr"><div class="cbadge">${hd.topClub}</div><div class="ci"><div class="ct">MES USAT</div><div class="cd">El pal que fas servir mes</div></div></div>`;
+    if(hd.bestClub&&hd.bestClub!==hd.topClub) html+=`<div class="cr"><div class="cbadge gold">${hd.bestClub}</div><div class="ci"><div class="ct">MILLOR RESULTAT</div><div class="cd">Millors scores de mitjana</div></div></div>`;
+    else if(hd.bestClub===hd.topClub) html+=`<div style="font-size:11px;color:var(--sub);margin-top:3px">&#10003; El mes usat coincideix amb el millor resultat</div>`;
+  } else html+=`<div style="color:var(--sub);font-size:13px">Sense dades de pal</div>`;
+  html+=`</div>`;
+  // SCORE
+  if(hd.avgScore!=null&&hd.par>0){
+    const d=hd.avgScore-hd.par, ds=d>0?'+'+d.toFixed(1):d.toFixed(1);
+    const dc=d<0?'#66bb6a':d===0?'#42a5f5':'#ffa726';
+    html+=`<div class="scard"><div class="sl">📊 Score Mitja</div><div class="sv">${hd.avgScore}</div><div class="ss" style="color:${dc};font-weight:700">${ds} al par</div></div>`;
+  }
+  // PUTTS
+  if(hd.avgPutts!=null) html+=`<div class="scard"><div class="sl">🏳️ Putts Mitjos</div><div class="sv">${hd.avgPutts}</div><div class="ss">${hd.rounds} rondes</div></div>`;
+  // GIR
+  if(hd.girPct!=null){
+    const c=hd.girPct>=50?'#66bb6a':hd.girPct>=25?'#ffa726':'#ef5350';
+    html+=`<div class="scard"><div class="sl">🎯 GIR</div><div class="sv" style="color:${c}">${hd.girPct}%</div><div class="ss">Green en regulacio</div></div>`;
+  }
+  // DISTRIBUTION
+  if(hd.scoreDist&&hd.rounds>0){
+    const dt=hd.scoreDist,tot=hd.rounds;
+    const rows=[{k:'eagle',l:'Eagle',c:'bar-eagle'},{k:'birdie',l:'Birdie',c:'bar-birdie'},
+      {k:'par',l:'Par',c:'bar-par'},{k:'bogey',l:'Bogey',c:'bar-bogey'},
+      {k:'double',l:'Doble',c:'bar-double'},{k:'worse',l:'>=+3',c:'bar-worse'}];
+    html+=`<div class="scard w2"><div class="sl">📈 Distribucio (${tot} rondes)</div>`;
+    rows.forEach(r=>{const cnt=dt[r.k]||0;if(!cnt)return;const p=Math.round(cnt*100/tot);
+      html+=`<div class="dr"><div class="dl">${r.l}</div><div class="db"><div class="dbf ${r.c}" style="width:${p}%"></div></div><div class="dn">${cnt}</div><div class="dp">${p}%</div></div>`;});
+    html+=`</div>`;
+  }
+  document.getElementById('sgrid').innerHTML=html;
+}
+
+function enc(s){return encodeURIComponent(s)}
+function fmtDate(d){
+  if(!d) return '';
+  const [y,m,dy]=d.split('-');
+  const mn=['gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des'];
+  return parseInt(dy)+' '+mn[parseInt(m)-1]+' '+y;
+}
+</script>
+</body>
+</html>
