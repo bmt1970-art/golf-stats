@@ -12,14 +12,14 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --g1:#8a9e76;--g2:#9aae86;--g3:#aabe96;--g4:#baced0;
-  --gold:#c9a227;--goldf:#f0c240;
+  --g1:#8a9e76;--g2:#9aae86;--g3:#aabe96;--g4:#6a8f6a;
+  --gold:#c9a227;--goldf:#b8891a;
   --red:#e53935;--blue:#1e88e5;--purple:#7e57c2;--orange:#fb8c00;
-  --white:#fff;--text:#f0f0f0;--sub:rgba(255,255,255,.5);
-  --card:rgba(255,255,255,.07);--border:rgba(255,255,255,.1);
+  --dk:#1a3a1a;--sub:rgba(26,58,26,.55);
+  --card:rgba(255,255,255,.28);--border:rgba(26,58,26,.18);
   --r:14px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)
 }
-html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--g1);color:#1a3a1a;overflow:hidden}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--g1);color:var(--dk);overflow:hidden}
 
 /* SCREENS */
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;padding-top:var(--st);padding-bottom:var(--sb);background:var(--g1);transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .25s}
@@ -31,8 +31,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Displ
 .hdr-info{flex:1;min-width:0}
 .hdr-info h2{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hdr-info p{font-size:11px;color:var(--sub);margin-top:2px}
-.btn-ico{flex-shrink:0;height:40px;border-radius:12px;border:none;color:var(--white);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;padding:0 12px;-webkit-tap-highlight-color:transparent}
-.btn-ico.back{width:40px;padding:0;background:rgba(255,255,255,.1);font-size:20px}
+.btn-ico{flex-shrink:0;height:40px;border-radius:12px;border:none;color:var(--dk);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;padding:0 12px;-webkit-tap-highlight-color:transparent}
+.btn-ico.back{width:40px;padding:0;background:rgba(255,255,255,.25);font-size:20px}
 .btn-ico.back:active,.btn-ico:active{opacity:.65}
 .btn-ico.action{background:var(--g3);white-space:nowrap}
 
@@ -75,24 +75,24 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Displ
 
 /* Score totals row */
 .rtotals{display:flex;gap:6px;padding:0 12px 10px;border-bottom:1px solid var(--border)}
-.rpill{display:flex;flex-direction:column;align-items:center;background:rgba(0,0,0,.2);border-radius:8px;padding:5px 10px;min-width:56px}
+.rpill{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.28);border-radius:8px;padding:5px 10px;min-width:56px}
 .rpill .rv{font-size:17px;font-weight:800;line-height:1}
 .rpill .rl{font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--sub);margin-top:2px;text-transform:uppercase}
-.rpill.pts .rv{color:var(--goldf)}
-.rpill.net .rv{color:#81d4fa}
+.rpill.pts .rv{color:#8a6000}
+.rpill.net .rv{color:#1565c0}
 
 /* Scorecard table */
 .sc-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px 0 8px}
 table.sc{border-collapse:collapse;font-size:11px;white-space:nowrap}
 table.sc td,table.sc th{padding:0;height:26px;text-align:center;vertical-align:middle}
 /* sticky label column */
-table.sc .lbl{position:sticky;left:0;background:#1f3f1f;z-index:2;padding:0 7px 0 10px;font-size:10px;font-weight:700;color:var(--sub);letter-spacing:.4px;text-align:left;white-space:nowrap;min-width:36px}
+table.sc .lbl{position:sticky;left:0;background:#4a6e4a;z-index:2;padding:0 7px 0 10px;font-size:10px;font-weight:700;color:rgba(255,255,255,.8);letter-spacing:.4px;text-align:left;white-space:nowrap;min-width:36px}
 /* hole number cells */
 table.sc .hnum{font-size:10px;font-weight:600;color:var(--sub);width:26px;min-width:26px}
 /* par cells */
-table.sc .hpar{font-size:11px;font-weight:600;color:rgba(255,255,255,.65);width:26px}
+table.sc .hpar{font-size:11px;font-weight:600;color:var(--dk);width:26px}
 /* distance cells */
-table.sc .hdist{font-size:10px;color:rgba(255,255,255,.5);width:26px}
+table.sc .hdist{font-size:10px;color:var(--sub);width:26px}
 /* score cells */
 table.sc .sc-cell{width:26px;min-width:26px;border-radius:5px;font-size:12px;font-weight:700}
 table.sc .eagle{background:#7e57c2;color:#fff}
@@ -103,9 +103,9 @@ table.sc .dbl{background:#b71c1c;color:#fff}
 table.sc .worse{background:#4a0000;color:#fff}
 table.sc .miss{color:var(--sub)}
 /* separator between 9 and 10 */
-table.sc .sep{width:6px;min-width:6px;background:rgba(255,255,255,.12);border-radius:3px}
+table.sc .sep{width:6px;min-width:6px;background:rgba(26,58,26,.15);border-radius:3px}
 /* row alternation */
-table.sc tr:nth-child(even) .lbl{background:#1a3a1a}
+table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 
 /* ── COURSE INFO BAR (logo + links) ── */
 .course-info-bar{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(0,0,0,.25);border-bottom:1px solid var(--border)}
@@ -115,14 +115,14 @@ table.sc tr:nth-child(even) .lbl{background:#1a3a1a}
 
 /* ── HOLE STATS (forat a forat) ── */
 .hole-nav{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
-.nav-btn{height:50px;width:80px;border:none;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.nav-btn{height:50px;width:80px;border:none;border-radius:12px;background:rgba(255,255,255,.28);color:var(--dk);font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .nav-btn:active{background:var(--g3)}
 .nav-btn:disabled{opacity:.25;pointer-events:none}
 .hole-title{text-align:center}
 .hole-title .hn{font-size:32px;font-weight:800;line-height:1}
 .hole-title .hp{font-size:13px;color:var(--sub);margin-top:2px}
 .dots{display:flex;gap:4px;justify-content:center;padding:2px 0 8px;flex-shrink:0}
-.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2)}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(26,58,26,.2)}
 .dot.on{background:var(--g4);width:16px;border-radius:3px}
 .sgrid{padding:0 12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .scard{background:var(--card);border-radius:var(--r);padding:13px;border:1px solid var(--border)}
@@ -132,13 +132,13 @@ table.sc tr:nth-child(even) .lbl{background:#1a3a1a}
 .ss{font-size:11px;color:var(--sub);margin-top:4px}
 .cr{display:flex;align-items:center;gap:9px;margin-bottom:7px}
 .cr:last-child{margin-bottom:0}
-.cbadge{background:var(--g3);color:#fff;font-size:15px;font-weight:800;padding:6px 11px;border-radius:9px;min-width:60px;text-align:center}
+.cbadge{background:rgba(255,255,255,.35);color:var(--dk);font-size:15px;font-weight:800;padding:6px 11px;border-radius:9px;min-width:60px;text-align:center}
 .cbadge.gold{background:var(--gold);color:#1a1a1a}
 .ci{flex:1}.ci .ct{font-size:10px;color:var(--sub);font-weight:700;letter-spacing:.5px}.ci .cd{font-size:13px;font-weight:600;margin-top:1px}
 .dr{display:flex;align-items:center;gap:6px;margin-bottom:5px}
 .dr:last-child{margin-bottom:0}
 .dl{font-size:11px;font-weight:700;width:46px;flex-shrink:0}
-.db{flex:1;height:19px;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden}
+.db{flex:1;height:19px;background:rgba(26,58,26,.12);border-radius:5px;overflow:hidden}
 .dbf{height:100%;border-radius:5px}
 .dn{font-size:11px;font-weight:700;width:18px;text-align:right}
 .dp{font-size:10px;width:28px;text-align:right;color:var(--sub)}
@@ -374,14 +374,14 @@ function renderHole(){
   // SCORE
   if(hd.avgScore!=null&&hd.par>0){
     const d=hd.avgScore-hd.par, ds=d>0?'+'+d.toFixed(1):d.toFixed(1);
-    const dc=d<0?'#66bb6a':d===0?'#42a5f5':'#ffa726';
+    const dc=d<0?'#2e7d32':d===0?'#1565c0':'#e65100';
     html+=`<div class="scard"><div class="sl">📊 Score Mitja</div><div class="sv">${hd.avgScore}</div><div class="ss" style="color:${dc};font-weight:700">${ds} al par</div></div>`;
   }
   // PUTTS
   if(hd.avgPutts!=null) html+=`<div class="scard"><div class="sl">🏳️ Putts Mitjos</div><div class="sv">${hd.avgPutts}</div><div class="ss">${hd.rounds} rondes</div></div>`;
   // GIR
   if(hd.girPct!=null){
-    const c=hd.girPct>=50?'#66bb6a':hd.girPct>=25?'#ffa726':'#ef5350';
+    const c=hd.girPct>=50?'#2e7d32':hd.girPct>=25?'#e65100':'#c62828';
     html+=`<div class="scard"><div class="sl">🎯 GIR</div><div class="sv" style="color:${c}">${hd.girPct}%</div><div class="ss">Green en regulacio</div></div>`;
   }
   // PENALTIES & SAND
