@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Golf Stats">
 <meta name="theme-color" content="#1a3d1a">
 <link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <title>Golf Stats</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -145,6 +146,12 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 .bar-eagle{background:#7e57c2}.bar-birdie{background:#2e7d32}.bar-par{background:#1565c0}
 .bar-bogey{background:#bf360c}.bar-double{background:#b71c1c}.bar-worse{background:#4a0000}
 .nodata{grid-column:1/-1;text-align:center;padding:32px 20px;color:var(--sub);font-size:14px;font-weight:700}
+
+/* ── GPS MAP ── */
+#gps-map{flex:1;min-height:0;z-index:0}
+.gps-legend{flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 14px;background:rgba(255,255,255,.28);border-top:1px solid var(--border)}
+.gps-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--dk)}
+.gps-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,.7)}
 </style>
 </head>
 <body>
@@ -184,10 +191,26 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
   <div class="hdr">
     <button class="btn-ico back" onclick="go('s-courses','s-rounds',true)">&#8249;</button>
     <div class="hdr-info"><h2 id="rl-title"></h2><p id="rl-sub"></p></div>
+    <button class="btn-ico action" id="btn-gps" onclick="openGPSMap()" style="display:none">🗺️ GPS</button>
     <button class="btn-ico action" onclick="openHoleStats()">⛳ Forat a forat</button>
   </div>
   <div class="course-info-bar" id="course-info-bar" style="display:none"></div>
   <div class="scroll"><div class="rlist" id="rlist"></div></div>
+</div>
+
+<!-- ══ GPS MAP ══ -->
+<div id="s-gps" class="screen off-r">
+  <div class="hdr">
+    <button class="btn-ico back" onclick="closeGPS()">&#8249;</button>
+    <div class="hdr-info"><h2 id="gps-title"></h2><p id="gps-sub"></p></div>
+  </div>
+  <div class="hole-nav">
+    <button class="nav-btn" id="gps-prev" onclick="gpsChH(-1)">&#8249; ANT</button>
+    <div class="hole-title"><div class="hn" id="gps-hn"></div><div class="hp" id="gps-hp"></div></div>
+    <button class="nav-btn" id="gps-next" onclick="gpsChH(1)">SEG &#8250;</button>
+  </div>
+  <div id="gps-map"></div>
+  <div class="gps-legend" id="gps-legend"></div>
 </div>
 
 <!-- ══ HOLE STATS ══ -->
@@ -208,6 +231,8 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script src="data.js"></script>
 <script src="scorecards.js"></script>
 <script src="full_courses.js"></script>
+<script src="gps_fontanals.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let curCourse=null, curHole=1;
 
@@ -255,6 +280,9 @@ function openCourse(encoded){
   } else {
     bar.innerHTML=''; bar.style.display='none';
   }
+
+  const gpsBtn=document.getElementById('btn-gps');
+  gpsBtn.style.display=(typeof GPS_DATA!=='undefined'&&GPS_DATA[curCourse.name])?'flex':'none';
 
   go('s-rounds','s-courses');
 }
@@ -422,6 +450,107 @@ function renderHole(){
     html+=`</div>`;
   }
   document.getElementById('sgrid').innerHTML=html;
+}
+
+// ── GPS MAP ──
+let gpsMap=null, gpsHole=1, gpsCourseData=null;
+
+function openGPSMap(){
+  if(typeof GPS_DATA==='undefined') return;
+  gpsCourseData=GPS_DATA[curCourse.name];
+  if(!gpsCourseData) return;
+  gpsHole=1;
+  document.getElementById('gps-title').textContent=curCourse.name;
+  document.getElementById('gps-sub').textContent='Mapa GPS';
+  go('s-gps','s-rounds');
+  setTimeout(()=>renderGPSHole(gpsHole),350);
+}
+
+function closeGPS(){
+  go('s-rounds','s-gps',true);
+}
+
+function gpsChH(d){
+  const n=gpsHole+d;
+  if(n<1||n>18) return;
+  gpsHole=n;
+  renderGPSHole(gpsHole);
+}
+
+function renderGPSHole(n){
+  gpsHole=n;
+  document.getElementById('gps-prev').disabled=n===1;
+  document.getElementById('gps-next').disabled=n===18;
+  document.getElementById('gps-hn').textContent='Forat '+n;
+
+  const allShots=[];
+  let holeGeo=null;
+  Object.values(gpsCourseData).forEach(rd=>{
+    if(rd.holeGeo&&rd.holeGeo[n]) holeGeo=rd.holeGeo[n];
+    if(rd.shots&&rd.shots[n]) allShots.push(...rd.shots[n]);
+  });
+
+  const par=holeGeo?holeGeo.par:'?';
+  const si=holeGeo&&holeGeo.si!=null?' · HCP '+holeGeo.si:'';
+  document.getElementById('gps-hp').textContent=holeGeo?`Par ${par}${si}`:'Sense dades de forat';
+
+  if(!gpsMap){
+    gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false});
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
+  } else {
+    gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer))gpsMap.removeLayer(l);});
+  }
+
+  const bounds=[];
+
+  if(holeGeo&&holeGeo.tee&&holeGeo.tee.lat){
+    const t=holeGeo.tee; bounds.push([t.lat,t.lon]);
+    L.circleMarker([t.lat,t.lon],{radius:8,color:'white',fillColor:'#2ecc71',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('Sortida');
+  }
+  if(holeGeo&&holeGeo.green&&holeGeo.green.lat){
+    const g=holeGeo.green; bounds.push([g.lat,g.lon]);
+    L.circleMarker([g.lat,g.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('Green');
+  }
+
+  const clubsShown=new Set();
+  allShots.forEach(s=>{
+    if(!s.lat||!s.lon) return;
+    bounds.push([s.lat,s.lon]);
+    const col=clubColor(s.club);
+    clubsShown.add(s.club);
+    L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
+      .addTo(gpsMap)
+      .bindPopup(`${clubLabel(s.club)}${s.lie?'<br>'+s.lie:''}`);
+  });
+
+  if(bounds.length) gpsMap.fitBounds(bounds,{padding:[20,20]});
+
+  let legHtml=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#2ecc71"></div>Sortida</div>`;
+  legHtml+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#f1c40f"></div>Green</div>`;
+  clubsShown.forEach(cl=>{
+    legHtml+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:${clubColor(cl)}"></div>${clubLabel(cl)}</div>`;
+  });
+  document.getElementById('gps-legend').innerHTML=legHtml;
+}
+
+function clubColor(type){
+  if(!type) return '#aaa';
+  if(type==='DRIVER') return '#e74c3c';
+  if(type.startsWith('WOOD')) return '#e67e22';
+  if(type==='HYBRID') return '#f39c12';
+  if(type.startsWith('IRON')) return '#3498db';
+  if(type.startsWith('WEDGE')) return '#9b59b6';
+  if(type==='PUTTER') return '#1abc9c';
+  return '#95a5a6';
+}
+
+function clubLabel(type){
+  if(!type) return 'Desconegut';
+  const m={DRIVER:'Driver',WOOD_3:'Fusta 3',WOOD_5:'Fusta 5',HYBRID:'Híbrid',
+    IRON_2:'Ferro 2',IRON_3:'Ferro 3',IRON_4:'Ferro 4',IRON_5:'Ferro 5',
+    IRON_6:'Ferro 6',IRON_7:'Ferro 7',IRON_8:'Ferro 8',IRON_9:'Ferro 9',
+    WEDGE_PITCHING:'PW',WEDGE_GAP:'GW',WEDGE_SAND:'SW',WEDGE_LOB:'LW',PUTTER:'Putt'};
+  return m[type]||type;
 }
 
 function enc(s){return encodeURIComponent(s).replace(/'/g,'%27')}

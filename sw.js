@@ -1,5 +1,5 @@
-const CACHE = 'golf-stats-v14';
-const FILES = ['./index.html', './data.js', './scorecards.js', './full_courses.js', './manifest.json'];
+const CACHE = 'golf-stats-v15';
+const FILES = ['./index.html', './data.js', './scorecards.js', './full_courses.js', './gps_fontanals.js', './manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
