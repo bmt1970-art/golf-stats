@@ -477,17 +477,22 @@ function gpsChH(d){
   renderGPSHole(gpsHole);
 }
 
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000,dL=(lat2-lat1)*Math.PI/180,dN=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dN/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+}
+
 function renderGPSHole(n){
   gpsHole=n;
   document.getElementById('gps-prev').disabled=n===1;
   document.getElementById('gps-next').disabled=n===18;
   document.getElementById('gps-hn').textContent='Forat '+n;
 
-  const allShots=[];
+  // First pass: find holeGeo
   let holeGeo=null;
   Object.values(gpsCourseData).forEach(rd=>{
     if(rd.holeGeo&&rd.holeGeo[n]) holeGeo=rd.holeGeo[n];
-    if(rd.shots&&rd.shots[n]) allShots.push(...rd.shots[n]);
   });
 
   const par=holeGeo?holeGeo.par:'?';
@@ -502,25 +507,42 @@ function renderGPSHole(n){
   }
 
   const bounds=[];
+  const greenPos=(holeGeo&&holeGeo.green&&holeGeo.green.lat)?holeGeo.green:null;
 
   if(holeGeo&&holeGeo.tee&&holeGeo.tee.lat){
     const t=holeGeo.tee; bounds.push([t.lat,t.lon]);
-    L.circleMarker([t.lat,t.lon],{radius:8,color:'white',fillColor:'#2ecc71',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('Sortida');
+    L.circleMarker([t.lat,t.lon],{radius:8,color:'white',fillColor:'#2ecc71',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Sortida</b>');
   }
-  if(holeGeo&&holeGeo.green&&holeGeo.green.lat){
-    const g=holeGeo.green; bounds.push([g.lat,g.lon]);
-    L.circleMarker([g.lat,g.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('Green');
+  if(greenPos){
+    const g=greenPos; bounds.push([g.lat,g.lon]);
+    L.circleMarker([g.lat,g.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
   }
 
   const clubsShown=new Set();
-  allShots.forEach(s=>{
-    if(!s.lat||!s.lon) return;
-    bounds.push([s.lat,s.lon]);
-    const col=clubColor(s.club);
-    clubsShown.add(s.club);
-    L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
-      .addTo(gpsMap)
-      .bindPopup(`${clubLabel(s.club)}${s.lie?'<br>'+s.lie:''}`);
+  // Second pass: process shots per round to compute sequential distances
+  Object.values(gpsCourseData).forEach(rd=>{
+    const shots=(rd.shots&&rd.shots[n])||[];
+    shots.forEach((s,i)=>{
+      if(!s.lat||!s.lon) return;
+      bounds.push([s.lat,s.lon]);
+      const col=clubColor(s.club);
+      clubsShown.add(s.club);
+
+      // Distance traveled = dist from this position to next shot's position (where ball landed)
+      let distTraveled=null;
+      for(let j=i+1;j<shots.length;j++){
+        if(shots[j].lat&&shots[j].lon){distTraveled=haversine(s.lat,s.lon,shots[j].lat,shots[j].lon);break;}
+      }
+      // Distance to green from this position
+      const distGreen=greenPos?haversine(s.lat,s.lon,greenPos.lat,greenPos.lon):null;
+
+      let popup=`<b>${clubLabel(s.club)}</b>`;
+      if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
+      if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
+
+      L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
+        .addTo(gpsMap).bindPopup(popup);
+    });
   });
 
   if(bounds.length) gpsMap.fitBounds(bounds,{padding:[20,20]});
