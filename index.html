@@ -454,6 +454,28 @@ function renderHole(){
 
 // ── GPS MAP ──
 let gpsMap=null, gpsHole=1, gpsCourseData=null;
+let gpsTrajectoryLayers=[], gpsSelMarker=null;
+
+function clearTrajectory(){
+  gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
+  gpsTrajectoryLayers=[];
+  gpsSelMarker=null;
+}
+
+function showTrajectory(shots, i){
+  clearTrajectory();
+  const curr=[shots[i].lat,shots[i].lon];
+  let prevPos=null;
+  for(let j=i-1;j>=0;j--){if(shots[j].lat&&shots[j].lon){prevPos=[shots[j].lat,shots[j].lon];break;}}
+  let nextPos=null;
+  for(let j=i+1;j<shots.length;j++){if(shots[j].lat&&shots[j].lon){nextPos=[shots[j].lat,shots[j].lon];break;}}
+  if(prevPos) gpsTrajectoryLayers.push(
+    L.polyline([prevPos,curr],{color:'#a8e6a8',weight:3,dashArray:'7 5',opacity:.95}).addTo(gpsMap)
+  );
+  if(nextPos) gpsTrajectoryLayers.push(
+    L.polyline([curr,nextPos],{color:'#ff9800',weight:3,opacity:.95}).addTo(gpsMap)
+  );
+}
 
 function openGPSMap(){
   if(typeof GPS_DATA==='undefined') return;
@@ -503,6 +525,7 @@ function renderGPSHole(n){
     gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
   } else {
+    clearTrajectory();
     gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer))gpsMap.removeLayer(l);});
   }
 
@@ -540,8 +563,15 @@ function renderGPSHole(n){
       if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
       if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
 
-      L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
+      const mk=L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
         .addTo(gpsMap).bindPopup(popup);
+      (function(capturedShots, capturedI, capturedMk){
+        capturedMk.on('click',function(){
+          if(gpsSelMarker===capturedMk){clearTrajectory();return;}
+          gpsSelMarker=capturedMk;
+          showTrajectory(capturedShots,capturedI);
+        });
+      })(shots,i,mk);
     });
   });
 
