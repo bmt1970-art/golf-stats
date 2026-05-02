@@ -265,7 +265,7 @@ function buildCard(r){
   let pillsHtml=`<div class="rpill"><div class="rv">${r.gross??'-'}</div><div class="rl">Brut</div></div>`;
   if(r.net!=null)  pillsHtml+=`<div class="rpill net"><div class="rv">${r.net}</div><div class="rl">Net</div></div>`;
   if(r.pts!=null)  pillsHtml+=`<div class="rpill pts"><div class="rv">${r.pts}</div><div class="rl">Stableford</div></div>`;
-  const scHtml=buildSC(r.hScores);
+  const scHtml=buildSC(r);
   return `<div class="rcard">
     <div class="rhead"><div class="rdate">📅 ${dateTxt}</div>${hcpHtml}</div>
     <div class="rtotals">${pillsHtml}</div>
@@ -273,24 +273,28 @@ function buildCard(r){
   </div>`;
 }
 
-function buildSC(hScores){
+function buildSC(r){
+  const hScores=r.hScores, hcp=r.hcp;
   if(!hScores||hScores.every(s=>s==null)) return '';
   const holes=curCourse.holes;
   const sc=(typeof SCORECARDS!=='undefined'&&SCORECARDS[curCourse.name])||(typeof FULL_COURSES!=='undefined'&&FULL_COURSES[curCourse.name])||null;
+  const hasSI=sc&&sc.holes.some(h=>h.si!=null);
+  const showNP=hasSI&&hcp!=null;
 
   let rNum='<tr><th class="lbl">Forat</th>';
   let rPar='<tr><th class="lbl">Par</th>';
   let rDst='<tr><th class="lbl">Dist</th>';
   let rHcp='<tr><th class="lbl">HCP</th>';
   let rSco='<tr><th class="lbl">Brut</th>';
+  let rNet=showNP?'<tr><th class="lbl">Net</th>':'';
+  let rPts=showNP?'<tr><th class="lbl">Pts</th>':'';
 
   for(let i=1;i<=18;i++){
     if(i===10){
-      rNum+='<td class="sep"></td>';
-      rPar+='<td class="sep"></td>';
-      rDst+='<td class="sep"></td>';
-      rHcp+='<td class="sep"></td>';
+      rNum+='<td class="sep"></td>';rPar+='<td class="sep"></td>';
+      rDst+='<td class="sep"></td>';rHcp+='<td class="sep"></td>';
       rSco+='<td class="sep"></td>';
+      if(showNP){rNet+='<td class="sep"></td>';rPts+='<td class="sep"></td>';}
     }
     const hd=holes[String(i)]||{};
     const par=hd.par||0;
@@ -305,16 +309,35 @@ function buildSC(hScores){
     rHcp+=`<td class="hdist">${si!=null?si:'-'}</td>`;
     if(s==null){
       rSco+=`<td class="sc-cell miss">-</td>`;
+      if(showNP){rNet+=`<td class="sc-cell miss">-</td>`;rPts+=`<td class="sc-cell miss">-</td>`;}
     } else {
-      const cls=sCls(s,par);
-      rSco+=`<td class="sc-cell ${cls}">${s}</td>`;
+      rSco+=`<td class="sc-cell ${sCls(s,par)}">${s}</td>`;
+      if(showNP){
+        const str=si!=null?strkGiven(si,hcp):0;
+        const net=s-str;
+        const pts=par>0?Math.max(0,par+2-net):null;
+        rNet+=`<td class="sc-cell ${sCls(net,par)}">${net}</td>`;
+        rPts+=pts!=null?`<td class="sc-cell ${ptCls(pts)}">${pts>0?'+'+pts:pts}</td>`:`<td class="sc-cell miss">-</td>`;
+      }
     }
   }
-  rNum+='</tr>'; rPar+='</tr>'; rDst+='</tr>'; rHcp+='</tr>'; rSco+='</tr>';
+  rNum+='</tr>';rPar+='</tr>';rDst+='</tr>';rHcp+='</tr>';rSco+='</tr>';
+  if(showNP){rNet+='</tr>';rPts+='</tr>';}
 
   return `<div class="sc-wrap"><table class="sc">
-    ${rNum}${rPar}${rDst}${rHcp}${rSco}
+    ${rNum}${rPar}${rDst}${rHcp}${rSco}${showNP?rNet+rPts:''}
   </table></div>`;
+}
+function strkGiven(si,hcp){
+  const base=Math.floor(hcp/18), extra=hcp%18;
+  return base+(si<=extra?1:0);
+}
+function ptCls(pts){
+  if(pts===0) return 'worse';
+  if(pts===1) return 'bogey';
+  if(pts===2) return 'par';
+  if(pts===3) return 'birdie';
+  return 'eagle';
 }
 
 function sCls(s,par){
