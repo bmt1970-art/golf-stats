@@ -149,6 +149,10 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 
 /* ── GPS MAP ── */
 #gps-map{flex:1;min-height:0;z-index:0}
+.gps-filter{flex-shrink:0;display:flex;gap:6px;padding:6px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;border-bottom:1px solid var(--border);scrollbar-width:none}
+.gps-filter::-webkit-scrollbar{display:none}
+.gps-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1.5px solid var(--border);font-size:11px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:var(--sub);-webkit-tap-highlight-color:transparent}
+.gps-chip.on{background:var(--g4);color:white;border-color:var(--g4)}
 .gps-legend{flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 14px;background:rgba(255,255,255,.28);border-top:1px solid var(--border)}
 .gps-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--dk)}
 .gps-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,.7)}
@@ -203,12 +207,14 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
   <div class="hdr">
     <button class="btn-ico back" onclick="closeGPS()">&#8249;</button>
     <div class="hdr-info"><h2 id="gps-title"></h2><p id="gps-sub"></p></div>
+    <button class="btn-ico action" id="btn-myloc" onclick="toggleMyLocation()" title="La meva posició">📍</button>
   </div>
   <div class="hole-nav">
     <button class="nav-btn" id="gps-prev" onclick="gpsChH(-1)">&#8249; ANT</button>
     <div class="hole-title"><div class="hn" id="gps-hn"></div><div class="hp" id="gps-hp"></div></div>
     <button class="nav-btn" id="gps-next" onclick="gpsChH(1)">SEG &#8250;</button>
   </div>
+  <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
   <div class="gps-legend" id="gps-legend"></div>
 </div>
@@ -455,6 +461,8 @@ function renderHole(){
 // ── GPS MAP ──
 let gpsMap=null, gpsHole=1, gpsCourseData=null;
 let gpsTrajectoryLayers=[], gpsSelMarker=null;
+let gpsShotsGroup=null, gpsSelectedRounds=new Set();
+let gpsWatchId=null, gpsMyMarker=null;
 
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
@@ -462,7 +470,7 @@ function clearTrajectory(){
   gpsSelMarker=null;
 }
 
-function showTrajectory(shots, i){
+function showTrajectory(shots,i){
   clearTrajectory();
   const curr=[shots[i].lat,shots[i].lon];
   let prevPos=null;
@@ -477,6 +485,27 @@ function showTrajectory(shots, i){
   );
 }
 
+function buildGpsFilter(){
+  const entries=Object.entries(gpsCourseData).sort((a,b)=>b[1].date.localeCompare(a[1].date));
+  gpsSelectedRounds=new Set(entries.map(([id])=>id));
+  const html=entries.map(([id,rd])=>
+    `<button class="gps-chip on" id="gchip-${id}" onclick="toggleGpsRound('${id}')">${fmtDateShort(rd.date)}${rd.gross?' ('+rd.gross+')':''}</button>`
+  ).join('');
+  document.getElementById('gps-filter').innerHTML=html;
+}
+
+function toggleGpsRound(id){
+  if(gpsSelectedRounds.has(id)){
+    gpsSelectedRounds.delete(id);
+    document.getElementById('gchip-'+id).classList.remove('on');
+  } else {
+    gpsSelectedRounds.add(id);
+    document.getElementById('gchip-'+id).classList.add('on');
+  }
+  clearTrajectory();
+  reRenderShots(gpsHole);
+}
+
 function openGPSMap(){
   if(typeof GPS_DATA==='undefined') return;
   gpsCourseData=GPS_DATA[curCourse.name];
@@ -484,11 +513,16 @@ function openGPSMap(){
   gpsHole=1;
   document.getElementById('gps-title').textContent=curCourse.name;
   document.getElementById('gps-sub').textContent='Mapa GPS';
+  buildGpsFilter();
   go('s-gps','s-rounds');
   setTimeout(()=>renderGPSHole(gpsHole),350);
 }
 
 function closeGPS(){
+  if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
+  if(gpsMyMarker&&gpsMap){gpsMap.removeLayer(gpsMyMarker);gpsMyMarker=null;}
+  const btn=document.getElementById('btn-myloc');
+  btn.style.background='';btn.style.color='';
   go('s-rounds','s-gps',true);
 }
 
@@ -505,18 +539,33 @@ function haversine(lat1,lon1,lat2,lon2){
   return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
 
+function buildShotMarker(shots,i,greenPos,targetGroup){
+  const s=shots[i];
+  if(!s.lat||!s.lon) return;
+  const col=clubColor(s.club);
+  let distTraveled=null;
+  for(let j=i+1;j<shots.length;j++){if(shots[j].lat&&shots[j].lon){distTraveled=haversine(s.lat,s.lon,shots[j].lat,shots[j].lon);break;}}
+  const distGreen=greenPos?haversine(s.lat,s.lon,greenPos.lat,greenPos.lon):null;
+  let popup=`<b>${clubLabel(s.club)}</b>`;
+  if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
+  if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
+  const mk=L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
+    .addTo(targetGroup).bindPopup(popup);
+  mk.on('click',function(){
+    if(gpsSelMarker===mk){clearTrajectory();return;}
+    gpsSelMarker=mk; showTrajectory(shots,i);
+  });
+  return col;
+}
+
 function renderGPSHole(n){
   gpsHole=n;
   document.getElementById('gps-prev').disabled=n===1;
   document.getElementById('gps-next').disabled=n===18;
   document.getElementById('gps-hn').textContent='Forat '+n;
 
-  // First pass: find holeGeo
   let holeGeo=null;
-  Object.values(gpsCourseData).forEach(rd=>{
-    if(rd.holeGeo&&rd.holeGeo[n]) holeGeo=rd.holeGeo[n];
-  });
-
+  Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])holeGeo=rd.holeGeo[n];});
   const par=holeGeo?holeGeo.par:'?';
   const si=holeGeo&&holeGeo.si!=null?' · HCP '+holeGeo.si:'';
   document.getElementById('gps-hp').textContent=holeGeo?`Par ${par}${si}`:'Sense dades de forat';
@@ -526,9 +575,10 @@ function renderGPSHole(n){
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
   } else {
     clearTrajectory();
-    gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer))gpsMap.removeLayer(l);});
+    gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer)&&l!==gpsMyMarker)gpsMap.removeLayer(l);});
   }
 
+  gpsShotsGroup=L.layerGroup().addTo(gpsMap);
   const bounds=[];
   const greenPos=(holeGeo&&holeGeo.green&&holeGeo.green.lat)?holeGeo.green:null;
 
@@ -537,52 +587,75 @@ function renderGPSHole(n){
     L.circleMarker([t.lat,t.lon],{radius:8,color:'white',fillColor:'#2ecc71',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Sortida</b>');
   }
   if(greenPos){
-    const g=greenPos; bounds.push([g.lat,g.lon]);
-    L.circleMarker([g.lat,g.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
+    bounds.push([greenPos.lat,greenPos.lon]);
+    L.circleMarker([greenPos.lat,greenPos.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
   }
 
   const clubsShown=new Set();
-  // Second pass: process shots per round to compute sequential distances
-  Object.values(gpsCourseData).forEach(rd=>{
+  Object.entries(gpsCourseData).forEach(([id,rd])=>{
+    if(!gpsSelectedRounds.has(id)) return;
     const shots=(rd.shots&&rd.shots[n])||[];
     shots.forEach((s,i)=>{
       if(!s.lat||!s.lon) return;
       bounds.push([s.lat,s.lon]);
-      const col=clubColor(s.club);
       clubsShown.add(s.club);
-
-      // Distance traveled = dist from this position to next shot's position (where ball landed)
-      let distTraveled=null;
-      for(let j=i+1;j<shots.length;j++){
-        if(shots[j].lat&&shots[j].lon){distTraveled=haversine(s.lat,s.lon,shots[j].lat,shots[j].lon);break;}
-      }
-      // Distance to green from this position
-      const distGreen=greenPos?haversine(s.lat,s.lon,greenPos.lat,greenPos.lon):null;
-
-      let popup=`<b>${clubLabel(s.club)}</b>`;
-      if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
-      if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
-
-      const mk=L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
-        .addTo(gpsMap).bindPopup(popup);
-      (function(capturedShots, capturedI, capturedMk){
-        capturedMk.on('click',function(){
-          if(gpsSelMarker===capturedMk){clearTrajectory();return;}
-          gpsSelMarker=capturedMk;
-          showTrajectory(capturedShots,capturedI);
-        });
-      })(shots,i,mk);
+      buildShotMarker(shots,i,greenPos,gpsShotsGroup);
     });
   });
 
   if(bounds.length) gpsMap.fitBounds(bounds,{padding:[20,20]});
+  updateGpsLegend(clubsShown);
+}
 
-  let legHtml=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#2ecc71"></div>Sortida</div>`;
-  legHtml+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#f1c40f"></div>Green</div>`;
-  clubsShown.forEach(cl=>{
-    legHtml+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:${clubColor(cl)}"></div>${clubLabel(cl)}</div>`;
+function reRenderShots(n){
+  if(!gpsShotsGroup||!gpsMap) return;
+  gpsShotsGroup.clearLayers();
+  let holeGeo=null;
+  Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])holeGeo=rd.holeGeo[n];});
+  const greenPos=(holeGeo&&holeGeo.green&&holeGeo.green.lat)?holeGeo.green:null;
+  const clubsShown=new Set();
+  Object.entries(gpsCourseData).forEach(([id,rd])=>{
+    if(!gpsSelectedRounds.has(id)) return;
+    const shots=(rd.shots&&rd.shots[n])||[];
+    shots.forEach((s,i)=>{
+      if(!s.lat||!s.lon) return;
+      clubsShown.add(s.club);
+      buildShotMarker(shots,i,greenPos,gpsShotsGroup);
+    });
   });
-  document.getElementById('gps-legend').innerHTML=legHtml;
+  updateGpsLegend(clubsShown);
+}
+
+function updateGpsLegend(clubsShown){
+  let h=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#2ecc71"></div>Sortida</div>`;
+  h+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#f1c40f"></div>Green</div>`;
+  clubsShown.forEach(cl=>{h+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:${clubColor(cl)}"></div>${clubLabel(cl)}</div>`;});
+  document.getElementById('gps-legend').innerHTML=h;
+}
+
+function toggleMyLocation(){
+  const btn=document.getElementById('btn-myloc');
+  if(gpsWatchId!==null){
+    navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId=null;
+    if(gpsMyMarker){gpsMap.removeLayer(gpsMyMarker);gpsMyMarker=null;}
+    btn.style.background=''; btn.style.color='';
+    return;
+  }
+  if(!navigator.geolocation){alert('GPS no disponible al dispositiu');return;}
+  btn.style.background='#1565c0'; btn.style.color='white';
+  gpsWatchId=navigator.geolocation.watchPosition(pos=>{
+    const {latitude:lat,longitude:lon}=pos.coords;
+    if(!gpsMyMarker){
+      gpsMyMarker=L.circleMarker([lat,lon],{radius:10,color:'white',fillColor:'#1e88e5',fillOpacity:1,weight:3})
+        .addTo(gpsMap).bindPopup('📍 La meva posició');
+    } else {
+      gpsMyMarker.setLatLng([lat,lon]);
+    }
+  },()=>{
+    btn.style.background=''; btn.style.color='';
+    navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId=null;
+    alert('No s\'ha pogut obtenir la posició GPS');
+  },{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
 }
 
 function clubColor(type){
@@ -606,6 +679,12 @@ function clubLabel(type){
 }
 
 function enc(s){return encodeURIComponent(s).replace(/'/g,'%27')}
+function fmtDateShort(d){
+  if(!d) return '';
+  const [y,m,dy]=d.split('-');
+  const mn=['gen','feb','mar','abr','mai','jun','jul','ago','set','oct','nov','des'];
+  return parseInt(dy)+'/'+mn[parseInt(m)-1]+'/'+y.slice(2);
+}
 function fmtDate(d){
   if(!d) return '';
   const [y,m,dy]=d.split('-');
