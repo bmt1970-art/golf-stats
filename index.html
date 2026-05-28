@@ -332,7 +332,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script src="data.js"></script>
 <script src="scorecards.js"></script>
 <script src="full_courses.js"></script>
-<script src="gps_fontanals.js"></script>
+<script src="gps_all.js"></script>
 <script src="clubs.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -342,7 +342,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=26',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=27',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
