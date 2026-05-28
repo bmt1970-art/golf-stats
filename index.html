@@ -178,6 +178,9 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
         <div class="bt"><b>Pitch &amp; Putt</b></div>
       </button>
     </div>
+    <div style="margin-top:18px;text-align:center">
+      <button onclick="forceUpdate()" style="background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;opacity:.6;padding:6px 12px">🔄 Força actualització</button>
+    </div>
   </div></div>
 </div>
 
@@ -246,7 +249,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=20',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=21',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -256,6 +259,19 @@ function go(to,from,back=false){
   t.classList.remove('off-r','off-l');
   f.classList.add(back?'off-r':'off-l');
   setTimeout(()=>{f.classList.remove('off-l')},330);
+}
+
+// FORCE UPDATE — unregister SW + clear all caches + reload
+async function forceUpdate(){
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+    const keys=await caches.keys();
+    await Promise.all(keys.map(k=>caches.delete(k)));
+  }catch(e){}
+  location.reload(true);
 }
 
 // HOME → COURSE SELECT
