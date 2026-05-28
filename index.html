@@ -180,6 +180,15 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 .rh-pills{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap}
 .rh-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.4)}
 .rh-pill.net{color:#1565c0}.rh-pill.pts{color:#8a6000}.rh-pill.putts{color:var(--sub)}
+
+/* ── DISTÀNCIES PAL ── */
+.hbtn.clubs{background:linear-gradient(135deg,#2a3d5e,#3d5e8b)}
+.club-type-row{flex-shrink:0;display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.1)}
+.club-type-btn{flex:1;padding:8px 0;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:800;cursor:pointer;background:rgba(255,255,255,.15);color:var(--sub);-webkit-tap-highlight-color:transparent}
+.club-type-btn.on{background:var(--g4);color:white;border-color:var(--g4)}
+.club-card{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:14px}
+.club-range{height:10px;background:rgba(26,58,26,.15);border-radius:5px;position:relative;margin-top:10px}
+.club-range-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--sub);margin-top:3px;font-weight:700}
 </style>
 </head>
 <body>
@@ -200,6 +209,10 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
       <button class="hbtn pp" onclick="selType('pp')">
         <span class="bi">🎯</span>
         <div class="bt"><b>Pitch &amp; Putt</b></div>
+      </button>
+      <button class="hbtn clubs" onclick="openClubs()">
+        <span class="bi">📏</span>
+        <div class="bt"><b>Distàncies</b><span>Estadístiques per pal</span></div>
       </button>
     </div>
     <div style="margin-top:18px;text-align:center">
@@ -291,10 +304,36 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
   <div class="scroll"><div class="inner-stats" id="stats-body"></div></div>
 </div>
 
+<!-- ══ CLUB DISTANCES ══ -->
+<div id="s-clubs" class="screen off-r">
+  <div class="hdr">
+    <button class="btn-ico back" onclick="go('s-home','s-clubs',true)">&#8249;</button>
+    <div class="hdr-info"><h2>📏 Distàncies per Pal</h2><p id="clubs-sub"></p></div>
+  </div>
+  <div class="stats-dates">
+    <div class="sd-row">
+      <label class="sd-label">Des de</label>
+      <input type="date" id="clubs-from" onchange="onClubsDateChange()">
+    </div>
+    <div class="sd-row">
+      <label class="sd-label">Fins a</label>
+      <input type="date" id="clubs-to" onchange="renderClubs()">
+    </div>
+  </div>
+  <div class="club-type-row">
+    <button class="club-type-btn on" id="ctbtn-all"  onclick="setClubType('all')">Tots</button>
+    <button class="club-type-btn"    id="ctbtn-full" onclick="setClubType('full')">Golf</button>
+    <button class="club-type-btn"    id="ctbtn-pp"   onclick="setClubType('pp')">P&amp;P</button>
+  </div>
+  <div class="gps-filter" id="clubs-course-filter"></div>
+  <div class="scroll"><div class="inner-stats" id="clubs-body"></div></div>
+</div>
+
 <script src="data.js"></script>
 <script src="scorecards.js"></script>
 <script src="full_courses.js"></script>
 <script src="gps_fontanals.js"></script>
+<script src="clubs.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let curCourse=null, curHole=1, curType=null, statsType=null;
@@ -303,7 +342,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=23',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=24',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -910,6 +949,182 @@ function renderStats(){
   html+=`</div></div>`;
 
   document.getElementById('stats-body').innerHTML=html;
+}
+
+// ── DISTÀNCIES PER PAL ──
+let clubsType='all', clubsSelCourses=new Set();
+
+const CLUB_ORDER=['D','3w','4w','5w','7w','2h','3h','4h','Hy',
+  '2i','3i','4i','5i','6i','7i','8i','9i',
+  'PW','GW','AW','SW','LW','60','58','56','54','52','50','PT','P'];
+const CLUB_LABEL={D:'Driver','3w':'Fusta 3','5w':'Fusta 5','7w':'Fusta 7',
+  'Hy':'Hybrid','3h':'H3','4h':'H4','2h':'H2',
+  '2i':'Ferro 2','3i':'Ferro 3','4i':'Ferro 4','5i':'Ferro 5',
+  '6i':'Ferro 6','7i':'Ferro 7','8i':'Ferro 8','9i':'Ferro 9',
+  'PW':'Pitching','GW':'Gap','AW':'Approach','SW':'Sand','LW':'Lob',
+  'PT':'Putter','P':'Putter'};
+
+function openClubs(){
+  if(typeof CLUB_DATA==='undefined'||!CLUB_DATA.length){
+    alert('Sense dades de distàncies disponibles');return;
+  }
+  clubsType='all';
+  document.querySelectorAll('.club-type-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('ctbtn-all').classList.add('on');
+  const dates=CLUB_DATA.map(r=>r.date).sort();
+  document.getElementById('clubs-from').value=dates[0];
+  document.getElementById('clubs-to').value=dates[dates.length-1];
+  buildCourseChips();
+  renderClubs();
+  go('s-clubs','s-home');
+}
+
+function setClubType(t){
+  clubsType=t;
+  document.querySelectorAll('.club-type-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('ctbtn-'+t).classList.add('on');
+  buildCourseChips();
+  renderClubs();
+}
+
+function onClubsDateChange(){
+  buildCourseChips();
+  renderClubs();
+}
+
+function buildCourseChips(){
+  const from=document.getElementById('clubs-from').value;
+  const to=document.getElementById('clubs-to').value;
+  let rounds=CLUB_DATA;
+  if(from) rounds=rounds.filter(r=>r.date>=from);
+  if(to)   rounds=rounds.filter(r=>r.date<=to);
+  if(clubsType!=='all') rounds=rounds.filter(r=>r.type===clubsType);
+  const courses=[...new Set(rounds.map(r=>r.course))].sort();
+  clubsSelCourses=new Set(courses);
+  if(courses.length<=1){document.getElementById('clubs-course-filter').innerHTML='';return;}
+  const html=courses.map(c=>`<button class="gps-chip on" id="cchip-${enc(c)}" onclick="toggleClubCourse('${enc(c)}')">${c}</button>`).join('');
+  document.getElementById('clubs-course-filter').innerHTML=
+    `<button class="gps-chip on" id="cchip-_all" onclick="toggleAllClubCourses()">✓ Tots</button>`+html;
+}
+
+function toggleClubCourse(encoded){
+  const c=decodeURIComponent(encoded);
+  if(clubsSelCourses.has(c)){clubsSelCourses.delete(c);document.getElementById('cchip-'+encoded).classList.remove('on');}
+  else{clubsSelCourses.add(c);document.getElementById('cchip-'+encoded).classList.add('on');}
+  const allBtn=document.getElementById('cchip-_all');
+  if(allBtn){
+    const total=document.querySelectorAll('[id^=cchip-]:not(#cchip-_all)').length;
+    allBtn.classList.toggle('on',clubsSelCourses.size===total);
+  }
+  renderClubs();
+}
+
+function toggleAllClubCourses(){
+  const chips=[...document.querySelectorAll('[id^=cchip-]:not(#cchip-_all)')];
+  const allOn=clubsSelCourses.size===chips.length;
+  if(allOn){
+    clubsSelCourses.clear();
+    chips.forEach(el=>el.classList.remove('on'));
+    document.getElementById('cchip-_all').classList.remove('on');
+  } else {
+    chips.forEach(el=>{clubsSelCourses.add(decodeURIComponent(el.id.replace('cchip-','')));el.classList.add('on');});
+    document.getElementById('cchip-_all').classList.add('on');
+  }
+  renderClubs();
+}
+
+function renderClubs(){
+  if(typeof CLUB_DATA==='undefined') return;
+  const from=document.getElementById('clubs-from').value;
+  const to=document.getElementById('clubs-to').value;
+  let rounds=CLUB_DATA;
+  if(from) rounds=rounds.filter(r=>r.date>=from);
+  if(to)   rounds=rounds.filter(r=>r.date<=to);
+  if(clubsType!=='all') rounds=rounds.filter(r=>r.type===clubsType);
+  rounds=rounds.filter(r=>clubsSelCourses.size===0||clubsSelCourses.has(r.course));
+  const nR=rounds.length, nC=new Set(rounds.map(r=>r.course)).size;
+  document.getElementById('clubs-sub').textContent=`${nR} partides · ${nC} camp${nC!==1?'s':''}`;
+  if(!nR){document.getElementById('clubs-body').innerHTML='<div class="nodata" style="margin-top:40px">Sense dades per aquest filtre</div>';return;}
+
+  // Aggregate
+  const clubAll={}, clubByRound={};
+  rounds.forEach(r=>{
+    Object.entries(r.clubs).forEach(([cl,dists])=>{
+      if(!clubAll[cl]) clubAll[cl]=[];
+      clubAll[cl].push(...dists);
+      if(!clubByRound[cl]) clubByRound[cl]=[];
+      const ra=Math.round(dists.reduce((a,b)=>a+b,0)/dists.length);
+      clubByRound[cl].push({date:r.date,avg:ra});
+    });
+  });
+
+  const sorted=Object.keys(clubAll).sort((a,b)=>{
+    const ia=CLUB_ORDER.indexOf(a),ib=CLUB_ORDER.indexOf(b);
+    if(ia===-1&&ib===-1) return a.localeCompare(b);
+    if(ia===-1) return 1; if(ib===-1) return -1; return ia-ib;
+  });
+
+  const scale=320;
+  let html='';
+  sorted.forEach(cl=>{
+    const dists=clubAll[cl];
+    const avg=Math.round(dists.reduce((a,b)=>a+b,0)/dists.length);
+    const max=Math.max(...dists), min=Math.min(...dists), n=dists.length;
+    const name=CLUB_LABEL[cl]||cl;
+
+    // Trend arrow
+    let trendHtml='';
+    const byR=(clubByRound[cl]||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+    if(byR.length>=4){
+      const h=Math.floor(byR.length/2);
+      const eA=Math.round(byR.slice(0,h).reduce((a,b)=>a+b.avg,0)/h);
+      const lA=Math.round(byR.slice(-h).reduce((a,b)=>a+b.avg,0)/h);
+      const diff=lA-eA;
+      const arrow=diff>2?'↑':diff<-2?'↓':'→';
+      const col=diff>2?'#2e7d32':diff<-2?'#c62828':'var(--sub)';
+      trendHtml=`<span style="color:${col};font-size:13px;font-weight:800">${arrow} ${diff>0?'+':''}${diff}m</span>`;
+    }
+
+    // Range bar
+    const minP=Math.min(99,Math.round(min/scale*100));
+    const maxP=Math.min(100,Math.round(max/scale*100));
+    const avgP=Math.min(100,Math.round(avg/scale*100));
+
+    // Sparkline SVG (per-round averages)
+    let spark='';
+    if(byR.length>1){
+      const sMin=Math.min(...byR.map(v=>v.avg)), sMax=Math.max(...byR.map(v=>v.avg));
+      const sRng=sMax-sMin||1;
+      const H=20, W=byR.length;
+      let bars='';
+      byR.forEach((v,i)=>{
+        const bh=Math.max(2,Math.round((v.avg-sMin)/sRng*(H-2)));
+        const x=Math.round(i/(W-1)*96);
+        const col2=i===byR.length-1?'var(--g4)':'rgba(106,143,106,.45)';
+        bars+=`<rect x="${x}" y="${H-bh}" width="3" height="${bh}" rx="1" fill="${col2}"/>`;
+      });
+      spark=`<div style="margin-top:8px;opacity:.9"><div style="font-size:9px;color:var(--sub);font-weight:700;margin-bottom:3px">EVOLUCIÓ (${byR.length} rondes)</div><svg width="100%" height="${H}" viewBox="0 0 100 ${H}" preserveAspectRatio="none">${bars}</svg><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--sub);font-weight:700;margin-top:1px"><span>${fmtDateShort(byR[0].date)}</span><span>${fmtDateShort(byR[byR.length-1].date)}</span></div></div>`;
+    }
+
+    html+=`<div class="club-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div><span style="font-size:17px;font-weight:800">${name}</span> <span style="font-size:11px;color:var(--sub);font-weight:700">${cl}</span></div>
+        <div style="display:flex;align-items:center;gap:8px">${trendHtml}<span style="font-size:11px;color:var(--sub);font-weight:700">${n} cop${n!==1?'s':''}</span></div>
+      </div>
+      <div class="stat-kpis">
+        <div class="stat-kpi grn"><div class="kv">${avg}m</div><div class="kl">Mitjana</div></div>
+        <div class="stat-kpi"><div class="kv">${max}m</div><div class="kl">Màxim</div></div>
+        <div class="stat-kpi"><div class="kv">${min}m</div><div class="kl">Mínim</div></div>
+      </div>
+      <div class="club-range">
+        <div style="position:absolute;left:${minP}%;width:${maxP-minP}%;height:100%;background:rgba(106,143,106,.3);border-radius:5px"></div>
+        <div style="position:absolute;left:${avgP}%;transform:translateX(-50%);width:3px;height:100%;background:var(--g4);border-radius:2px"></div>
+      </div>
+      <div class="club-range-labels"><span>${min}m</span><span>⊕${avg}m</span><span>${max}m</span></div>
+      ${spark}
+    </div>`;
+  });
+  document.getElementById('clubs-body').innerHTML=html;
 }
 
 function enc(s){return encodeURIComponent(s).replace(/'/g,'%27')}
