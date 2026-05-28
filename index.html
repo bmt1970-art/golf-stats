@@ -342,7 +342,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=28',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=29',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -663,7 +663,8 @@ function openGPSMap(){
 
 function closeGPS(){
   if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
-  if(gpsMyMarker&&gpsMap){gpsMap.removeLayer(gpsMyMarker);gpsMyMarker=null;}
+  if(gpsMap){gpsMap.remove();gpsMap=null;}
+  gpsMyMarker=null;
   const btn=document.getElementById('btn-myloc');
   btn.style.background='';btn.style.color='';
   go('s-rounds','s-gps',true);
