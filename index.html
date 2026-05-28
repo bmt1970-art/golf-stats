@@ -246,7 +246,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=19',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=20',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
