@@ -1,4 +1,4 @@
-const CACHE = 'golf-stats-v25';
+const CACHE = 'golf-stats-v26';
 const FILES = ['./index.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_fontanals.js', './manifest.json'];
 
 self.addEventListener('install', e => {

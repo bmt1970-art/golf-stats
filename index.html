@@ -342,7 +342,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=25',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=26',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -954,15 +954,10 @@ function renderStats(){
 // ── DISTÀNCIES PER PAL ──
 let clubsType='all', clubsSelCourses=new Set();
 
-const CLUB_ORDER=['D','3w','4w','5w','7w','2h','3h','4h','Hy',
-  '2i','3i','4i','5i','6i','7i','8i','9i',
-  'PW','GW','AW','SW','LW','60','58','56','54','52','50','PT','P'];
-const CLUB_LABEL={D:'Driver','3w':'Fusta 3','5w':'Fusta 5','7w':'Fusta 7',
-  'Hy':'Hybrid','3h':'H3','4h':'H4','2h':'H2',
-  '2i':'Ferro 2','3i':'Ferro 3','4i':'Ferro 4','5i':'Ferro 5',
-  '6i':'Ferro 6','7i':'Ferro 7','8i':'Ferro 8','9i':'Ferro 9',
-  'PW':'Pitching','GW':'Gap','AW':'Approach','SW':'Sand','LW':'Lob',
-  'PT':'Putter','P':'Putter'};
+const CLUB_ORDER=['D','3w','5w','4h','3i','5i','6i','7i','8i','9i','PW','UW','SW','LW'];
+const CLUB_LABEL={D:'Driver','3w':'Fusta 3','5w':'Fusta 5','4h':'Híbrid 4',
+  '3i':'Ferro 3','5i':'Ferro 5','6i':'Ferro 6','7i':'Ferro 7',
+  '8i':'Ferro 8','9i':'Ferro 9','PW':'Pitching','UW':'Utility W','SW':'Sand','LW':'Lob'};
 
 function openClubs(){
   if(typeof CLUB_DATA==='undefined'||!CLUB_DATA.length){
@@ -1072,11 +1067,8 @@ function renderClubs(){
     });
   });
 
-  const sorted=Object.keys(clubA).sort((a,b)=>{
-    const ia=CLUB_ORDER.indexOf(a),ib=CLUB_ORDER.indexOf(b);
-    if(ia===-1&&ib===-1) return a.localeCompare(b);
-    if(ia===-1) return 1; if(ib===-1) return -1; return ia-ib;
-  });
+  // Ordre i llista exacta definida per CLUB_ORDER; ignora qualsevol altre pal
+  const sorted=CLUB_ORDER.filter(cl=>clubA[cl]&&clubA[cl].length>0);
 
   const scale=320;
   let html='';
