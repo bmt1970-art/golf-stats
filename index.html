@@ -253,6 +253,16 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button class="btn-ico back" onclick="go('s-rounds','s-hstats',true)">&#8249;</button>
     <div class="hdr-info"><h2 id="st-title"></h2></div>
   </div>
+  <div class="stats-dates">
+    <div class="sd-row">
+      <label class="sd-label">Des de</label>
+      <input type="date" id="hs-from" onchange="renderHole()">
+    </div>
+    <div class="sd-row">
+      <label class="sd-label">Fins a</label>
+      <input type="date" id="hs-to" onchange="renderHole()">
+    </div>
+  </div>
   <div class="hole-nav">
     <button class="nav-btn" id="btn-prev" onclick="chH(-1)">&#8249; ANT</button>
     <div class="hole-title"><div class="hn" id="st-hn"></div><div class="hp" id="st-hp"></div></div>
@@ -293,7 +303,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=22',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=23',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -457,8 +467,21 @@ function sCls(s,par){
 function openHoleStats(){
   curHole=1;
   document.getElementById('st-title').textContent=curCourse.name;
+  const dates=curCourse.roundsList.map(r=>r.date).sort();
+  if(dates.length){
+    document.getElementById('hs-from').value=dates[0];
+    document.getElementById('hs-to').value=dates[dates.length-1];
+  }
   buildDots(); renderHole();
   go('s-hstats','s-rounds');
+}
+function getHsFilteredScores(holeIdx){
+  const from=document.getElementById('hs-from')?.value;
+  const to=document.getElementById('hs-to')?.value;
+  let rounds=curCourse.roundsList;
+  if(from) rounds=rounds.filter(r=>r.date>=from);
+  if(to)   rounds=rounds.filter(r=>r.date<=to);
+  return rounds.map(r=>r.hScores?.[holeIdx]).filter(s=>s!=null&&s>0);
 }
 function chH(d){
   const n=curHole+d;
@@ -487,8 +510,14 @@ function renderHole(){
   const dispDist=offDist!=null?offDist:hd.meters;
   let subtitle=hd.par>0?'Par '+hd.par+(dispDist?' · '+dispDist+'m':'')+(offSI!=null?' · HCP '+offSI:''):'';
   document.getElementById('st-hp').textContent=subtitle;
+
+  // Scores filtrats per data
+  const fScores=getHsFilteredScores(curHole-1);
+  const fCount=fScores.length;
+  const fAvg=fCount?Math.round(fScores.reduce((a,b)=>a+b,0)/fCount*10)/10:null;
+
   let html='';
-  // CLUBS
+  // CLUBS (sempre tot-temps)
   html+=`<div class="scard w2"><div class="sl">🏌️ Pal de Sortida</div>`;
   if(hd.topClub||hd.bestClub){
     if(hd.topClub) html+=`<div class="cr"><div class="cbadge">${hd.topClub}</div><div class="ci"><div class="ct">MES USAT</div><div class="cd">El pal que fas servir mes</div></div></div>`;
@@ -496,30 +525,37 @@ function renderHole(){
     else if(hd.bestClub===hd.topClub) html+=`<div style="font-size:11px;color:var(--sub);margin-top:3px">&#10003; El mes usat coincideix amb el millor resultat</div>`;
   } else html+=`<div style="color:var(--sub);font-size:13px">Sense dades de pal</div>`;
   html+=`</div>`;
-  // SCORE
-  if(hd.avgScore!=null&&hd.par>0){
-    const d=hd.avgScore-hd.par, ds=d>0?'+'+d.toFixed(1):d.toFixed(1);
+  // SCORE (filtrat)
+  if(fAvg!=null&&hd.par>0){
+    const d=fAvg-hd.par, ds=d>0?'+'+d.toFixed(1):d.toFixed(1);
     const dc=d<0?'#2e7d32':d===0?'#1565c0':'#e65100';
-    html+=`<div class="scard"><div class="sl">📊 Score Mitja</div><div class="sv">${hd.avgScore}</div><div class="ss" style="color:${dc};font-weight:700">${ds} al par</div></div>`;
+    html+=`<div class="scard"><div class="sl">📊 Score Mitja</div><div class="sv">${fAvg}</div><div class="ss" style="color:${dc};font-weight:700">${ds} al par · ${fCount} rondes</div></div>`;
+  } else if(fCount===0){
+    html+=`<div class="scard"><div class="sl">📊 Score Mitja</div><div class="sv" style="color:var(--sub)">-</div><div class="ss">Sense rondes al filtre</div></div>`;
   }
-  // PUTTS
-  if(hd.avgPutts!=null) html+=`<div class="scard"><div class="sl">🏳️ Putts Mitjos</div><div class="sv">${hd.avgPutts}</div><div class="ss">${hd.rounds} rondes</div></div>`;
-  // GIR
+  // PUTTS (tot-temps)
+  if(hd.avgPutts!=null) html+=`<div class="scard"><div class="sl">🏳️ Putts Mitjos</div><div class="sv">${hd.avgPutts}</div><div class="ss">${hd.rounds} rondes (total)</div></div>`;
+  // GIR (tot-temps)
   if(hd.girPct!=null){
     const c=hd.girPct>=50?'#2e7d32':hd.girPct>=25?'#e65100':'#c62828';
-    html+=`<div class="scard"><div class="sl">🎯 GIR</div><div class="sv" style="color:${c}">${hd.girPct}%</div><div class="ss">Green en regulacio</div></div>`;
+    html+=`<div class="scard"><div class="sl">🎯 GIR</div><div class="sv" style="color:${c}">${hd.girPct}%</div><div class="ss">Green en regulacio (total)</div></div>`;
   }
-  // PENALTIES & SAND
-  if(hd.avgPenalties!=null&&hd.avgPenalties>0) html+=`<div class="scard"><div class="sl">⚠️ Penalitzacions</div><div class="sv">${hd.avgPenalties}</div><div class="ss">Mitjana per ronda</div></div>`;
-  if(hd.avgSand!=null&&hd.avgSand>0) html+=`<div class="scard"><div class="sl">🏖️ Sortides Sorra</div><div class="sv">${hd.avgSand}</div><div class="ss">Mitjana per ronda</div></div>`;
-  // DISTRIBUTION
-  if(hd.scoreDist&&hd.rounds>0){
-    const dt=hd.scoreDist,tot=hd.rounds;
+  // PENALTIES & SAND (tot-temps)
+  if(hd.avgPenalties!=null&&hd.avgPenalties>0) html+=`<div class="scard"><div class="sl">⚠️ Penalitzacions</div><div class="sv">${hd.avgPenalties}</div><div class="ss">Mitjana per ronda (total)</div></div>`;
+  if(hd.avgSand!=null&&hd.avgSand>0) html+=`<div class="scard"><div class="sl">🏖️ Sortides Sorra</div><div class="sv">${hd.avgSand}</div><div class="ss">Mitjana per ronda (total)</div></div>`;
+  // DISTRIBUTION (filtrat)
+  if(fCount>0&&hd.par>0){
+    const dist={eagle:0,birdie:0,par:0,bogey:0,double:0,worse:0};
+    fScores.forEach(s=>{const d=s-hd.par;
+      if(d<=-2)dist.eagle++;else if(d===-1)dist.birdie++;
+      else if(d===0)dist.par++;else if(d===1)dist.bogey++;
+      else if(d===2)dist.double++;else dist.worse++;
+    });
     const rows=[{k:'eagle',l:'Eagle',c:'bar-eagle'},{k:'birdie',l:'Birdie',c:'bar-birdie'},
       {k:'par',l:'Par',c:'bar-par'},{k:'bogey',l:'Bogey',c:'bar-bogey'},
       {k:'double',l:'Doble',c:'bar-double'},{k:'worse',l:'>=+3',c:'bar-worse'}];
-    html+=`<div class="scard w2"><div class="sl">📈 Distribucio (${tot} rondes)</div>`;
-    rows.forEach(r=>{const cnt=dt[r.k]||0;if(!cnt)return;const p=Math.round(cnt*100/tot);
+    html+=`<div class="scard w2"><div class="sl">📈 Distribucio (${fCount} rondes)</div>`;
+    rows.forEach(r=>{const cnt=dist[r.k]||0;if(!cnt)return;const p=Math.round(cnt*100/fCount);
       html+=`<div class="dr"><div class="dl">${r.l}</div><div class="db"><div class="dbf ${r.c}" style="width:${p}%"></div></div><div class="dn">${cnt}</div><div class="dp">${p}%</div></div>`;});
     html+=`</div>`;
   }
@@ -860,6 +896,7 @@ function renderStats(){
   html+=`<div class="stat-section"><div class="stat-sec-title">📅 Historial de Partides</div><div class="rounds-hist">`;
   rounds.forEach(r=>{
     let pills='';
+    if(r.hcp!=null)      pills+=`<span class="rh-pill">HCP ${r.hcp}</span>`;
     if(r.net!=null)      pills+=`<span class="rh-pill net">Net ${r.net}</span>`;
     if(r.pts!=null)      pills+=`<span class="rh-pill pts">${r.pts}pts</span>`;
     if(r.putts!=null&&r.putts>0) pills+=`<span class="rh-pill putts">${r.putts}p</span>`;
