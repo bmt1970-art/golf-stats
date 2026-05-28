@@ -156,6 +156,30 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 .gps-legend{flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 14px;background:rgba(255,255,255,.28);border-top:1px solid var(--border)}
 .gps-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--dk)}
 .gps-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,.7)}
+
+/* ── ESTADÍSTIQUES GLOBALS ── */
+.stats-dates{flex-shrink:0;display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.1)}
+.sd-row{flex:1;display:flex;flex-direction:column;gap:4px}
+.sd-label{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--sub);text-transform:uppercase}
+.sd-row input[type=date]{border:1.5px solid var(--border);background:rgba(255,255,255,.25);border-radius:9px;padding:7px 10px;font-size:14px;font-weight:600;color:var(--dk);width:100%;outline:none;-webkit-appearance:none}
+.inner-stats{padding:12px 14px 24px;display:flex;flex-direction:column;gap:14px}
+.stat-section{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:14px}
+.stat-sec-title{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--sub);margin-bottom:12px}
+.stat-kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat-kpi{background:rgba(255,255,255,.3);border-radius:10px;padding:10px 6px;text-align:center}
+.stat-kpi .kv{font-size:21px;font-weight:800;line-height:1}
+.stat-kpi .kl{font-size:8px;font-weight:800;letter-spacing:.4px;color:var(--sub);margin-top:3px;text-transform:uppercase;line-height:1.2}
+.stat-kpi.hi .kv{color:#8a6000}
+.stat-kpi.blu .kv{color:#1565c0}
+.stat-kpi.grn .kv{color:#2e7d32}
+.rounds-hist{display:flex;flex-direction:column;gap:6px}
+.rh-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.2);border-radius:10px}
+.rh-date{font-size:12px;font-weight:700;color:var(--dk);min-width:72px;flex-shrink:0}
+.rh-course{flex:1;font-size:11px;color:var(--sub);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rh-gross{font-size:15px;font-weight:800;flex-shrink:0;min-width:28px;text-align:right}
+.rh-pills{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap}
+.rh-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.4)}
+.rh-pill.net{color:#1565c0}.rh-pill.pts{color:#8a6000}.rh-pill.putts{color:var(--sub)}
 </style>
 </head>
 <body>
@@ -189,6 +213,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
   <div class="hdr">
     <button class="btn-ico back" onclick="go('s-home','s-courses',true)">&#8249;</button>
     <div class="hdr-info"><h2 id="cs-title"></h2><p id="cs-sub"></p></div>
+    <button class="btn-ico action" onclick="openStats()">📊 Stats</button>
   </div>
   <div class="scroll"><div class="clist" id="clist"></div></div>
 </div>
@@ -223,9 +248,9 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 </div>
 
 <!-- ══ HOLE STATS ══ -->
-<div id="s-stats" class="screen off-r">
+<div id="s-hstats" class="screen off-r">
   <div class="hdr">
-    <button class="btn-ico back" onclick="go('s-rounds','s-stats',true)">&#8249;</button>
+    <button class="btn-ico back" onclick="go('s-rounds','s-hstats',true)">&#8249;</button>
     <div class="hdr-info"><h2 id="st-title"></h2></div>
   </div>
   <div class="hole-nav">
@@ -237,19 +262,38 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
   <div class="scroll"><div class="sgrid" id="sgrid"></div></div>
 </div>
 
+<!-- ══ GLOBAL STATS ══ -->
+<div id="s-stats" class="screen off-r">
+  <div class="hdr">
+    <button class="btn-ico back" onclick="go('s-courses','s-stats',true)">&#8249;</button>
+    <div class="hdr-info"><h2 id="gst-title"></h2><p id="gst-sub"></p></div>
+  </div>
+  <div class="stats-dates">
+    <div class="sd-row">
+      <label class="sd-label">Des de</label>
+      <input type="date" id="stats-from" onchange="renderStats()">
+    </div>
+    <div class="sd-row">
+      <label class="sd-label">Fins a</label>
+      <input type="date" id="stats-to" onchange="renderStats()">
+    </div>
+  </div>
+  <div class="scroll"><div class="inner-stats" id="stats-body"></div></div>
+</div>
+
 <script src="data.js"></script>
 <script src="scorecards.js"></script>
 <script src="full_courses.js"></script>
 <script src="gps_fontanals.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let curCourse=null, curHole=1;
+let curCourse=null, curHole=1, curType=null, statsType=null;
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=21',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=22',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -277,6 +321,7 @@ async function forceUpdate(){
 // HOME → COURSE SELECT
 function selType(type){
   const list=GOLF_DATA.filter(c=>c.type===type);
+  curType=type;
   document.getElementById('cs-title').textContent=type==='full'?'Golf':'Pitch & Putt';
   document.getElementById('cs-sub').textContent=list.length+' camps disponibles';
   document.getElementById('clist').innerHTML=list.map(c=>`
@@ -413,7 +458,7 @@ function openHoleStats(){
   curHole=1;
   document.getElementById('st-title').textContent=curCourse.name;
   buildDots(); renderHole();
-  go('s-stats','s-rounds');
+  go('s-hstats','s-rounds');
 }
 function chH(d){
   const n=curHole+d;
@@ -699,6 +744,135 @@ function clubLabel(type){
     IRON_6:'Ferro 6',IRON_7:'Ferro 7',IRON_8:'Ferro 8',IRON_9:'Ferro 9',
     WEDGE_PITCHING:'PW',WEDGE_GAP:'GW',WEDGE_SAND:'SW',WEDGE_LOB:'LW',PUTTER:'Putt'};
   return m[type]||type;
+}
+
+// ── ESTADÍSTIQUES GLOBALS ──
+function openStats(){
+  statsType=curType;
+  const label=statsType==='full'?'Golf':'Pitch & Putt';
+  document.getElementById('gst-title').textContent='📊 Estadístiques '+label;
+  // Calcula rang de dates automàtic
+  const all=getAllRoundsOfType(statsType);
+  if(all.length){
+    const dates=all.map(r=>r.date).sort();
+    document.getElementById('stats-from').value=dates[0];
+    document.getElementById('stats-to').value=dates[dates.length-1];
+  }
+  renderStats();
+  go('s-stats','s-courses');
+}
+
+function getAllRoundsOfType(type){
+  const list=[];
+  GOLF_DATA.filter(c=>c.type===type).forEach(course=>{
+    const pars=[];
+    for(let i=1;i<=18;i++){const h=course.holes[String(i)];pars.push(h?h.par:0);}
+    course.roundsList.forEach(r=>list.push({...r,courseName:course.name,coursePars:pars}));
+  });
+  return list;
+}
+
+function renderStats(){
+  const from=document.getElementById('stats-from').value;
+  const to=document.getElementById('stats-to').value;
+  let rounds=getAllRoundsOfType(statsType);
+  if(from) rounds=rounds.filter(r=>r.date>=from);
+  if(to)   rounds=rounds.filter(r=>r.date<=to);
+  rounds.sort((a,b)=>b.date.localeCompare(a.date));
+
+  document.getElementById('gst-sub').textContent=rounds.length+' partide'+(rounds.length!==1?'s':'');
+
+  if(!rounds.length){
+    document.getElementById('stats-body').innerHTML='<div class="nodata" style="margin-top:40px">Sense partides en aquest interval</div>';
+    return;
+  }
+
+  const avg=arr=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):null;
+  const best=arr=>arr.length?Math.min(...arr):null;
+  const worst=arr=>arr.length?Math.max(...arr):null;
+  const fmt=v=>v!=null?v:'-';
+
+  const grossArr=rounds.map(r=>r.gross).filter(v=>v!=null);
+  const netArr=rounds.map(r=>r.net).filter(v=>v!=null);
+  const ptsArr=rounds.map(r=>r.pts).filter(v=>v!=null);
+  const puttsArr=rounds.map(r=>r.putts).filter(v=>v!=null&&v>0);
+  const girArr=rounds.map(r=>r.gir).filter(v=>v!=null);
+  const penArr=rounds.map(r=>r.penalties).filter(v=>v!=null);
+
+  const avgGirPct=girArr.length?Math.round(girArr.reduce((a,b)=>a+b,0)/girArr.length/18*100):null;
+
+  // Score distribution
+  const dist={eagle:0,birdie:0,par:0,bogey:0,double:0,worse:0,total:0};
+  rounds.forEach(r=>{
+    if(!r.hScores||!r.coursePars) return;
+    r.hScores.forEach((s,i)=>{
+      if(s==null) return;
+      const par=r.coursePars[i]; if(!par) return;
+      dist.total++;
+      const d=s-par;
+      if(d<=-2) dist.eagle++; else if(d===-1) dist.birdie++;
+      else if(d===0) dist.par++; else if(d===1) dist.bogey++;
+      else if(d===2) dist.double++; else dist.worse++;
+    });
+  });
+
+  let html='';
+
+  // KPIs principals
+  html+=`<div class="stat-section"><div class="stat-sec-title">🏌️ Puntuació (${rounds.length} partides)</div><div class="stat-kpis">`;
+  html+=`<div class="stat-kpi"><div class="kv">${fmt(avg(grossArr))}</div><div class="kl">Gross Mig</div></div>`;
+  html+=`<div class="stat-kpi grn"><div class="kv">${fmt(best(grossArr))}</div><div class="kl">Millor Gross</div></div>`;
+  html+=`<div class="stat-kpi"><div class="kv">${fmt(worst(grossArr))}</div><div class="kl">Pitjor Gross</div></div>`;
+  if(netArr.length){
+    html+=`<div class="stat-kpi blu"><div class="kv">${fmt(avg(netArr))}</div><div class="kl">Net Mig</div></div>`;
+    html+=`<div class="stat-kpi blu"><div class="kv">${fmt(best(netArr))}</div><div class="kl">Millor Net</div></div>`;
+  }
+  if(ptsArr.length){
+    html+=`<div class="stat-kpi hi"><div class="kv">${fmt(avg(ptsArr))}</div><div class="kl">Pts Stblf Mig</div></div>`;
+    html+=`<div class="stat-kpi hi"><div class="kv">${fmt(worst(ptsArr))}</div><div class="kl">Millor Pts Stblf</div></div>`;
+  }
+  html+=`</div></div>`;
+
+  // Mètriques
+  if(puttsArr.length||girArr.length||penArr.length){
+    html+=`<div class="stat-section"><div class="stat-sec-title">📐 Mètriques per Partida</div><div class="stat-kpis">`;
+    if(puttsArr.length) html+=`<div class="stat-kpi"><div class="kv">${fmt(avg(puttsArr))}</div><div class="kl">Putts Mig</div></div>`;
+    if(girArr.length)   html+=`<div class="stat-kpi grn"><div class="kv">${avgGirPct!=null?avgGirPct+'%':'-'}</div><div class="kl">GIR %</div></div>`;
+    if(penArr.length)   html+=`<div class="stat-kpi"><div class="kv">${fmt(avg(penArr))}</div><div class="kl">Penalitz. Mig</div></div>`;
+    html+=`</div></div>`;
+  }
+
+  // Distribució
+  if(dist.total>0){
+    const rows=[{k:'eagle',l:'Eagle ≤-2',c:'bar-eagle'},{k:'birdie',l:'Birdie -1',c:'bar-birdie'},
+      {k:'par',l:'Par',c:'bar-par'},{k:'bogey',l:'Bogey +1',c:'bar-bogey'},
+      {k:'double',l:'Doble +2',c:'bar-double'},{k:'worse',l:'≥+3',c:'bar-worse'}];
+    html+=`<div class="stat-section"><div class="stat-sec-title">📈 Distribució (${dist.total} forats jugats)</div>`;
+    rows.forEach(row=>{
+      const cnt=dist[row.k]||0; if(!cnt) return;
+      const p=Math.round(cnt*100/dist.total);
+      html+=`<div class="dr"><div class="dl">${row.l}</div><div class="db"><div class="dbf ${row.c}" style="width:${p}%"></div></div><div class="dn">${cnt}</div><div class="dp">${p}%</div></div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // Historial
+  html+=`<div class="stat-section"><div class="stat-sec-title">📅 Historial de Partides</div><div class="rounds-hist">`;
+  rounds.forEach(r=>{
+    let pills='';
+    if(r.net!=null)      pills+=`<span class="rh-pill net">Net ${r.net}</span>`;
+    if(r.pts!=null)      pills+=`<span class="rh-pill pts">${r.pts}pts</span>`;
+    if(r.putts!=null&&r.putts>0) pills+=`<span class="rh-pill putts">${r.putts}p</span>`;
+    html+=`<div class="rh-row">
+      <div class="rh-date">${fmtDateShort(r.date)}</div>
+      <div class="rh-course">${r.courseName}</div>
+      <div class="rh-gross">${r.gross??'-'}</div>
+      ${pills?'<div class="rh-pills">'+pills+'</div>':''}
+    </div>`;
+  });
+  html+=`</div></div>`;
+
+  document.getElementById('stats-body').innerHTML=html;
 }
 
 function enc(s){return encodeURIComponent(s).replace(/'/g,'%27')}
