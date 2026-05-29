@@ -269,7 +269,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button id="btn-hide-putt" class="gps-tool-btn" onclick="toggleShotFilter('putt')">P/Ch</button>
     <button id="btn-hide-wedge" class="gps-tool-btn" onclick="toggleShotFilter('wedge')">Wedge</button>
     <button id="btn-hide-iron" class="gps-tool-btn" onclick="toggleShotFilter('iron')">Ferro</button>
-    <button class="gps-tool-btn" onclick="clearSelection()" title="Esborra selecció">✕ Selecció</button>
+    <button id="btn-hide-all" class="gps-tool-btn" onclick="toggleHideAllShots()">✕ Cops</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
@@ -633,6 +633,7 @@ let gpsShotsGroup=null, gpsSelectedRounds=new Set();
 let gpsWatchId=null, gpsMyMarker=null;
 let gpsClubMode=false, gpsClubMarker=null, gpsClubLine=null;
 let gpsHidePutts=false, gpsHideWedges=false, gpsHideIrons=false;
+let gpsHideAllShots=false;
 
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
@@ -640,10 +641,12 @@ function clearTrajectory(){
   gpsSelMarker=null;
 }
 
-function clearSelection(){
+function toggleHideAllShots(){
+  gpsHideAllShots=!gpsHideAllShots;
+  document.getElementById('btn-hide-all').classList.toggle('hidden-filter',gpsHideAllShots);
   clearTrajectory();
-  clearClubRec();
   if(gpsMap) gpsMap.closePopup();
+  reRenderShots(gpsHole);
 }
 
 function showTrajectory(shots,i){
@@ -707,10 +710,10 @@ function closeGPS(){
   if(gpsMap){
     const dead=gpsMap;
     gpsMyMarker=null; gpsClubMarker=null; gpsClubLine=null; gpsMap=null;
-    gpsClubMode=false; gpsHidePutts=false; gpsHideWedges=false; gpsHideIrons=false;
+    gpsClubMode=false; gpsHidePutts=false; gpsHideWedges=false; gpsHideIrons=false; gpsHideAllShots=false;
     const cbtn=document.getElementById('btn-club-rec');
     if(cbtn) cbtn.classList.remove('active');
-    ['btn-hide-putt','btn-hide-wedge','btn-hide-iron'].forEach(id=>{
+    ['btn-hide-putt','btn-hide-wedge','btn-hide-iron','btn-hide-all'].forEach(id=>{
       const b=document.getElementById(id); if(b) b.classList.remove('hidden-filter');
     });
     const mapEl=document.getElementById('gps-map');
@@ -1003,13 +1006,15 @@ function renderGPSHole(n){
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
-    const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
-    if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5}).addTo(gpsShotsGroup);
-    shots.forEach((s,i)=>{
-      if(!s.lat||!s.lon||!clubVisible(s.club)) return;
-      clubsShown.add(s.club);
-      buildShotMarker(shots,i,greenPos,gpsShotsGroup);
-    });
+    if(!gpsHideAllShots){
+      const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
+      if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5}).addTo(gpsShotsGroup);
+      shots.forEach((s,i)=>{
+        if(!s.lat||!s.lon||!clubVisible(s.club)) return;
+        clubsShown.add(s.club);
+        buildShotMarker(shots,i,greenPos,gpsShotsGroup);
+      });
+    }
   });
 
   updateGpsLegend(clubsShown);
