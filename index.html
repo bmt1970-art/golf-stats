@@ -722,15 +722,22 @@ function buildShotMarker(shots,i,greenPos,targetGroup){
   const s=shots[i];
   if(!s.lat||!s.lon) return;
   const col=clubColor(s.club);
+  // Distància cop anterior (el que va portar la pilota aquí)
+  let prevClub=null,prevDist=null;
+  if(i>0){for(let j=i-1;j>=0;j--){if(shots[j].lat&&shots[j].lon){prevClub=shots[j].club;prevDist=haversine(shots[j].lat,shots[j].lon,s.lat,s.lon);break;}}}
+  // Distància cop actual (fins a on va anar la pilota)
   let distTraveled=null;
   for(let j=i+1;j<shots.length;j++){if(shots[j].lat&&shots[j].lon){distTraveled=haversine(s.lat,s.lon,shots[j].lat,shots[j].lon);break;}}
   const distGreen=greenPos?haversine(s.lat,s.lon,greenPos.lat,greenPos.lon):null;
   // Popup detallat (clic)
   let popup=`<b>${clubLabel(s.club)}</b>`;
+  if(prevDist!=null)     popup+=`<br>↩️ Cop anterior: <b>${clubLabel(prevClub)} ${prevDist}m</b>`;
   if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
   if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
-  // Etiqueta permanent (sempre visible): pal · distància cop · distància green
-  let lbl=clubLabelShort(s.club);
+  // Etiqueta permanent: [pal anterior Xm ▶] pal actual Xm · 🏌️Xm
+  let lbl='';
+  if(prevClub&&prevDist) lbl+=`${clubLabelShort(prevClub)} ${prevDist}m ▶ `;
+  lbl+=clubLabelShort(s.club);
   if(distTraveled!=null) lbl+=` ${distTraveled}m`;
   if(distGreen!=null)    lbl+=` · 🏌️${distGreen}m`;
   const mk=L.circleMarker([s.lat,s.lon],{radius:6,color:'rgba(255,255,255,0.75)',fillColor:col,fillOpacity:0.92,weight:2})
