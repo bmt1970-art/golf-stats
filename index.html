@@ -345,7 +345,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=34',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=35',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -609,6 +609,7 @@ let gpsMap=null, gpsHole=1, gpsCourseData=null;
 let gpsTrajectoryLayers=[], gpsSelMarker=null;
 let gpsShotsGroup=null, gpsSelectedRounds=new Set();
 let gpsWatchId=null, gpsMyMarker=null;
+let gpsNeedsRebuild=false;
 
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
@@ -666,9 +667,8 @@ function openGPSMap(){
 
 function closeGPS(){
   if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
-  if(gpsMap){gpsMap.remove();gpsMap=null;}
-  gpsMyMarker=null;gpsShotsGroup=null;gpsSelMarker=null;
-  clearTrajectory();
+  if(gpsMyMarker&&gpsMap){gpsMap.removeLayer(gpsMyMarker);gpsMyMarker=null;}
+  gpsNeedsRebuild=true;
   const btn=document.getElementById('btn-myloc');
   btn.style.background='';btn.style.color='';
   go('s-rounds','s-gps',true);
@@ -724,6 +724,7 @@ function renderGPSHole(n){
   const si=holeGeo&&holeGeo.si!=null?' · HCP '+holeGeo.si:'';
   document.getElementById('gps-hp').textContent=holeGeo?`Par ${par}${si}`:'Sense dades de forat';
 
+  if(gpsNeedsRebuild&&gpsMap){gpsMap.remove();gpsMap=null;gpsNeedsRebuild=false;}
   if(!gpsMap){
     gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
