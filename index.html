@@ -269,6 +269,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button id="btn-hide-putt" class="gps-tool-btn" onclick="toggleShotFilter('putt')">P/Ch</button>
     <button id="btn-hide-wedge" class="gps-tool-btn" onclick="toggleShotFilter('wedge')">Wedge</button>
     <button id="btn-hide-iron" class="gps-tool-btn" onclick="toggleShotFilter('iron')">Ferro</button>
+    <button class="gps-tool-btn" onclick="clearSelection()" title="Esborra selecció">✕ Selecció</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
@@ -637,6 +638,12 @@ function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
   gpsTrajectoryLayers=[];
   gpsSelMarker=null;
+}
+
+function clearSelection(){
+  clearTrajectory();
+  clearClubRec();
+  if(gpsMap) gpsMap.closePopup();
 }
 
 function showTrajectory(shots,i){
