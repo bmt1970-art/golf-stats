@@ -730,10 +730,11 @@ function buildShotMarker(shots,i,greenPos,targetGroup){
   for(let j=i+1;j<shots.length;j++){if(shots[j].lat&&shots[j].lon){distTraveled=haversine(s.lat,s.lon,shots[j].lat,shots[j].lon);break;}}
   const distGreen=greenPos?haversine(s.lat,s.lon,greenPos.lat,greenPos.lon):null;
   // Popup detallat (clic)
-  let popup=`<b>${clubLabelShort(s.club)}</b>`;
-  if(prevDist!=null)     popup+=`<br>↩️ Anterior: <b>${clubLabelShort(prevClub)} ${prevDist}m</b>`;
-  if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
-  if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
+  let popup='';
+  if(prevDist!=null)     popup+=`↩️ Anterior: <b>${clubLabelShort(prevClub)} ${prevDist}m</b><br>`;
+  if(distTraveled!=null) popup+=`🏌️ <b>${clubLabelShort(s.club)} ${distTraveled}m</b><br>`;
+  else                   popup+=`🏌️ <b>${clubLabelShort(s.club)}</b><br>`;
+  if(distGreen!=null)    popup+=`🏳️ Fins al green: <b>${distGreen}m</b>`;
   const mk=L.circleMarker([s.lat,s.lon],{radius:7,color:'rgba(255,255,255,0.75)',fillColor:col,fillOpacity:0.92,weight:2})
     .addTo(targetGroup)
     .bindPopup(popup);
