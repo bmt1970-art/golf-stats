@@ -844,43 +844,49 @@ function onClubMapClick(latlng){
   // Distàncies
   const distFront =frontPos ?haversine(latlng.lat,latlng.lng,frontPos.lat, frontPos.lon) :null;
   const distMiddle=middlePos?haversine(latlng.lat,latlng.lng,middlePos.lat,middlePos.lon):null;
-  // Recomanació basada en distància a l'entrada (front)
-  const recDist=distFront!==null?distFront:distMiddle;
+  // Estadístiques: mateix camp 2 anys | tots els camps 1 any
   const m1=clubStatsMeans(buildClubDistances(curCourse.name,2));
   const m2=clubStatsMeans(buildClubDistances(null,1));
   const useMeans=Object.keys(m1).length>=3?m1:m2;
   const srcLbl=Object.keys(m1).length>=3?'Camp (2a)':'General (1a)';
-  function top3(means){
-    return Object.entries(means)
-      .map(([c,i])=>({c,mean:i.mean,n:i.n,diff:Math.abs(i.mean-recDist)}))
-      .sort((a,b)=>a.diff-b.diff).slice(0,3);
-  }
-  const primary=top3(useMeans);
-  const secondary=Object.keys(m1).length>=3?top3(m2):null;
-  // HTML del popup
-  let html=`<div style="min-width:185px;font-family:sans-serif">`;
-  // Distàncies entrada / centre
-  html+=`<div style="font-size:12px;margin-bottom:6px;line-height:1.6">`;
-  if(distFront!==null)  html+=`<div>🟢 Entrada green: <b>${distFront}m</b></div>`;
-  if(distMiddle!==null&&distMiddle!==distFront) html+=`<div style="opacity:.75">⚪ Centre green: <b>${distMiddle}m</b></div>`;
-  html+=`</div>`;
-  // Recomanació
-  if(primary.length===0){
-    html+=`<div style="font-size:11px;color:#999">Sense dades suficients</div>`;
-  } else {
-    html+=`<div style="font-size:10px;font-weight:700;color:#1a3a1a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">${srcLbl}</div>`;
-    primary.forEach((it,idx)=>{
-      const big=idx===0;
-      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;${big?'font-size:15px;font-weight:800':'font-size:12px;opacity:.72'}">`;
-      html+=`<span>${big?'🏌️ ':''}${clubLabelShort(it.c)}</span>`;
-      html+=`<span style="color:#1a3a1a">~${it.mean}m <span style="font-size:9px;color:#999">(${it.n}c)</span></span>`;
-      html+=`</div>`;
+  // Troba el millor pal per a una distància donada
+  function bestClub(means,d){
+    if(d===null) return null;
+    let best=null,bestDiff=Infinity;
+    Object.entries(means).forEach(([c,i])=>{
+      const diff=Math.abs(i.mean-d);
+      if(diff<bestDiff){bestDiff=diff;best={c,mean:i.mean,n:i.n};}
     });
-    if(secondary&&secondary.length>0&&secondary[0].c!==primary[0].c){
-      html+=`<div style="margin-top:5px;padding-top:5px;border-top:1px solid #ddd;font-size:10px;color:#666">`;
-      html+=`<span style="font-weight:700">General (1a): </span>`;
-      html+=`${clubLabelShort(secondary[0].c)} ~${secondary[0].mean}m (${secondary[0].n}c)</div>`;
+    return best;
+  }
+  const recFront =bestClub(useMeans,distFront);
+  const recMiddle=bestClub(useMeans,distMiddle);
+  // HTML del popup — dues files: entrada i centre
+  let html=`<div style="min-width:200px;font-family:sans-serif">`;
+  html+=`<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${srcLbl}</div>`;
+  // Fila entrada
+  if(distFront!==null){
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee">`;
+    html+=`<div style="font-size:11px;color:#1a3a1a;font-weight:700">🟢 Entrada<br><span style="font-size:13px">${distFront}m</span></div>`;
+    if(recFront) html+=`<div style="text-align:right;font-size:16px;font-weight:800">🏌️ ${clubLabelShort(recFront.c)}<br><span style="font-size:10px;color:#555;font-weight:400">~${recFront.mean}m (${recFront.n}c)</span></div>`;
+    else         html+=`<div style="font-size:11px;color:#999">—</div>`;
+    html+=`</div>`;
+  }
+  // Fila centre
+  if(distMiddle!==null){
+    const showCentre=distMiddle!==distFront;
+    const recC=showCentre?recMiddle:null;
+    const dC=showCentre?distMiddle:null;
+    if(showCentre){
+      html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">`;
+      html+=`<div style="font-size:11px;color:#555;font-weight:700">⚪ Centre<br><span style="font-size:13px">${dC}m</span></div>`;
+      if(recC) html+=`<div style="text-align:right;font-size:16px;font-weight:800">🏌️ ${clubLabelShort(recC.c)}<br><span style="font-size:10px;color:#555;font-weight:400">~${recC.mean}m (${recC.n}c)</span></div>`;
+      else     html+=`<div style="font-size:11px;color:#999">—</div>`;
+      html+=`</div>`;
     }
+  }
+  if(!recFront&&!recMiddle){
+    html+=`<div style="font-size:11px;color:#999;padding-top:4px">Sense dades suficients</div>`;
   }
   html+=`</div>`;
   // Línia fins a l'entrada del green (referència de la recomanació)
