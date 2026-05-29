@@ -345,7 +345,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=36',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=37',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -609,7 +609,6 @@ let gpsMap=null, gpsHole=1, gpsCourseData=null;
 let gpsTrajectoryLayers=[], gpsSelMarker=null;
 let gpsShotsGroup=null, gpsSelectedRounds=new Set();
 let gpsWatchId=null, gpsMyMarker=null;
-let gpsNeedsRebuild=false;
 
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
@@ -667,8 +666,13 @@ function openGPSMap(){
 
 function closeGPS(){
   if(gpsWatchId!==null){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
-  if(gpsMyMarker&&gpsMap){gpsMap.removeLayer(gpsMyMarker);gpsMyMarker=null;}
-  gpsNeedsRebuild=true;
+  // Diferim el .remove() real 350ms (fora del clic, transicio acabada)
+  // Pero posem gpsMap=null ara perque el proper renderGPSHole creï mapa nou
+  if(gpsMap){
+    const dead=gpsMap;
+    gpsMyMarker=null; gpsMap=null;
+    setTimeout(()=>dead.remove(),350);
+  }
   const btn=document.getElementById('btn-myloc');
   btn.style.background='';btn.style.color='';
   go('s-rounds','s-gps',true);
@@ -724,13 +728,14 @@ function renderGPSHole(n){
   const si=holeGeo&&holeGeo.si!=null?' · HCP '+holeGeo.si:'';
   document.getElementById('gps-hp').textContent=holeGeo?`Par ${par}${si}`:'Sense dades de forat';
 
-  gpsNeedsRebuild=false;
   if(!gpsMap){
     gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
   } else {
     clearTrajectory();
-    gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer)&&l!==gpsMyMarker)gpsMap.removeLayer(l);});
+    const toRemove=[];
+    gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer)&&l!==gpsMyMarker)toRemove.push(l);});
+    toRemove.forEach(l=>gpsMap.removeLayer(l));
   }
 
   gpsShotsGroup=L.layerGroup().addTo(gpsMap);
@@ -761,12 +766,7 @@ function renderGPSHole(n){
     });
   });
 
-  if(bounds.length){
-    const lb=L.latLngBounds(bounds);
-    gpsMap.invalidateSize(false);
-    const z=Math.min(19,Math.max(14,gpsMap.getBoundsZoom(lb.pad(0.15))));
-    gpsMap.setView(lb.getCenter(),z,{animate:false});
-  }
+  if(bounds.length) gpsMap.fitBounds(bounds,{padding:[30,30]});
   updateGpsLegend(clubsShown);
 }
 
