@@ -699,6 +699,18 @@ function gpsChH(d){
   renderGPSHole(gpsHole);
 }
 
+// Retorna els cops a mostrar: tots menys els putts a partir del segon
+function filterGpsShots(shots){
+  let puttSeen=false;
+  return shots.filter(s=>{
+    if(s.club==='PUTTER'){
+      if(puttSeen) return false;
+      puttSeen=true;
+    }
+    return true;
+  });
+}
+
 function haversine(lat1,lon1,lat2,lon2){
   const R=6371000,dL=(lat2-lat1)*Math.PI/180,dN=(lon2-lon1)*Math.PI/180;
   const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dN/2)**2;
@@ -749,7 +761,7 @@ function renderGPSHole(n){
   if(greenPos){bounds.push([greenPos.lat,greenPos.lon]);}
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
-    const shots=(rd.shots&&rd.shots[n])||[];
+    const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
     shots.forEach(s=>{if(s.lat&&s.lon)bounds.push([s.lat,s.lon]);});
   });
 
@@ -778,7 +790,7 @@ function renderGPSHole(n){
   const clubsShown=new Set();
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
-    const shots=(rd.shots&&rd.shots[n])||[];
+    const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
     const pts=shots.filter(s=>s.lat&&s.lon).map(s=>[s.lat,s.lon]);
     if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5}).addTo(gpsShotsGroup);
     shots.forEach((s,i)=>{
@@ -803,7 +815,7 @@ function reRenderShots(n){
   const clubsShown=new Set();
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
-    const shots=(rd.shots&&rd.shots[n])||[];
+    const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
     const pts=shots.filter(s=>s.lat&&s.lon).map(s=>[s.lat,s.lon]);
     if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
     shots.forEach((s,i)=>{
