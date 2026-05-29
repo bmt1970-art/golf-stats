@@ -156,6 +156,11 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 .gps-legend{flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 14px;background:rgba(255,255,255,.28);border-top:1px solid var(--border)}
 .gps-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--dk)}
 .gps-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,.7)}
+.gps-toolbar{flex-shrink:0;display:flex;gap:8px;padding:5px 12px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.08)}
+.gps-tool-btn{display:flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:var(--dk);-webkit-tap-highlight-color:transparent;transition:background .18s,color .18s,border-color .18s}
+.gps-tool-btn.active{background:var(--g4);color:white;border-color:var(--g4)}
+#gps-map.club-mode{cursor:crosshair!important}
+#gps-map.club-mode .leaflet-interactive{cursor:crosshair!important}
 /* etiquetes permanents de cop */
 .leaflet-tooltip.gps-label{background:rgba(0,0,0,.72);border:none;border-radius:10px;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5)}
 .leaflet-tooltip.gps-label::before{display:none}
@@ -257,6 +262,9 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button class="nav-btn" id="gps-prev" onclick="gpsChH(-1)">&#8249; ANT</button>
     <div class="hole-title"><div class="hn" id="gps-hn"></div><div class="hp" id="gps-hp"></div></div>
     <button class="nav-btn" id="gps-next" onclick="gpsChH(1)">SEG &#8250;</button>
+  </div>
+  <div class="gps-toolbar">
+    <button id="btn-club-rec" class="gps-tool-btn" onclick="toggleClubMode()">🏌️ Pal recomanat</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
@@ -618,6 +626,7 @@ let gpsMap=null, gpsHole=1, gpsCourseData=null;
 let gpsTrajectoryLayers=[], gpsSelMarker=null;
 let gpsShotsGroup=null, gpsSelectedRounds=new Set();
 let gpsWatchId=null, gpsMyMarker=null;
+let gpsClubMode=false, gpsClubMarker=null, gpsClubLine=null;
 
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
@@ -667,7 +676,7 @@ function openGPSMap(){
   if(!gpsCourseData) return;
   gpsHole=1;
   document.getElementById('gps-title').textContent=curCourse.name;
-  document.getElementById('gps-sub').textContent='Mapa GPS · v44';
+  document.getElementById('gps-sub').textContent='Mapa GPS · v45';
   buildGpsFilter();
   go('s-gps','s-rounds');
   setTimeout(()=>{
@@ -685,7 +694,12 @@ function closeGPS(){
   // Pero posem gpsMap=null ara perque el proper renderGPSHole creï mapa nou
   if(gpsMap){
     const dead=gpsMap;
-    gpsMyMarker=null; gpsMap=null;
+    gpsMyMarker=null; gpsClubMarker=null; gpsClubLine=null; gpsMap=null;
+    gpsClubMode=false;
+    const cbtn=document.getElementById('btn-club-rec');
+    if(cbtn) cbtn.classList.remove('active');
+    const mapEl=document.getElementById('gps-map');
+    if(mapEl) mapEl.classList.remove('club-mode');
     setTimeout(()=>dead.remove(),350);
   }
   const btn=document.getElementById('btn-myloc');
@@ -710,6 +724,123 @@ function filterGpsShots(shots){
     }
     return true;
   });
+}
+
+// ── PAL RECOMANAT ──
+function toggleClubMode(){
+  gpsClubMode=!gpsClubMode;
+  document.getElementById('btn-club-rec').classList.toggle('active',gpsClubMode);
+  document.getElementById('gps-map').classList.toggle('club-mode',gpsClubMode);
+  if(!gpsClubMode) clearClubRec();
+}
+
+function clearClubRec(){
+  if(gpsMap&&gpsClubMarker) gpsMap.removeLayer(gpsClubMarker);
+  if(gpsMap&&gpsClubLine)   gpsMap.removeLayer(gpsClubLine);
+  gpsClubMarker=null; gpsClubLine=null;
+}
+
+// Construeix {club:[dist,...]} per a cops bons (inStats=true), sense putts
+function buildClubDistances(courseFilter,maxYears){
+  if(typeof GPS_DATA==='undefined') return {};
+  const stats={};
+  const now=new Date();
+  Object.entries(GPS_DATA).forEach(([courseName,rounds])=>{
+    if(courseFilter&&courseName!==courseFilter) return;
+    Object.values(rounds).forEach(rd=>{
+      const rdDate=new Date(rd.date);
+      const yearsAgo=(now-rdDate)/(1000*60*60*24*365.25);
+      if(maxYears&&yearsAgo>maxYears) return;
+      Object.values(rd.shots||{}).forEach(holeShots=>{
+        for(let i=0;i<holeShots.length;i++){
+          const s=holeShots[i];
+          if(!s.inStats||!s.lat||!s.lon||s.club==='PUTTER') continue;
+          let nxt=null;
+          for(let j=i+1;j<holeShots.length;j++){if(holeShots[j].lat&&holeShots[j].lon){nxt=holeShots[j];break;}}
+          if(!nxt) continue;
+          const d=haversine(s.lat,s.lon,nxt.lat,nxt.lon);
+          if(d<15||d>350) continue;
+          if(!stats[s.club]) stats[s.club]=[];
+          stats[s.club].push(d);
+        }
+      });
+    });
+  });
+  return stats;
+}
+
+// Calcula {club:{mean,n}} amb mitja retallada (15% cada extrem)
+function clubStatsMeans(stats){
+  const means={};
+  Object.entries(stats).forEach(([club,dists])=>{
+    if(dists.length<3) return;
+    const s=[...dists].sort((a,b)=>a-b);
+    const trim=dists.length>6?Math.max(1,Math.floor(s.length*.15)):0;
+    const t=s.slice(trim,s.length-trim);
+    means[club]={mean:Math.round(t.reduce((a,b)=>a+b,0)/t.length),n:dists.length};
+  });
+  return means;
+}
+
+function onClubMapClick(latlng){
+  if(!gpsMap) return;
+  const n=gpsHole;
+  // Obtenir posició del green
+  const cgH=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
+  let grnPos=null;
+  if(cgH&&cgH.green&&cgH.green.middle) grnPos=cgH.green.middle;
+  else{
+    let hg=null;
+    Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])hg=rd.holeGeo[n];});
+    if(hg&&hg.green&&hg.green.lat) grnPos=hg.green;
+  }
+  clearClubRec();
+  if(!grnPos){
+    gpsClubMarker=L.circleMarker([latlng.lat,latlng.lng],{radius:9,color:'white',fillColor:'#ff9800',fillOpacity:1,weight:2})
+      .addTo(gpsMap).bindPopup('<b>Sense dades del green</b>').openPopup();
+    return;
+  }
+  const dist=haversine(latlng.lat,latlng.lng,grnPos.lat,grnPos.lon);
+  // Estadístiques: mateix camp 2 anys | tots els camps 1 any
+  const m1=clubStatsMeans(buildClubDistances(curCourse.name,2));
+  const m2=clubStatsMeans(buildClubDistances(null,1));
+  const useMeans=Object.keys(m1).length>=3?m1:m2;
+  const srcLbl=Object.keys(m1).length>=3?'Camp (2a)':'General (1a)';
+  function top3(means){
+    return Object.entries(means)
+      .map(([c,i])=>({c,mean:i.mean,n:i.n,diff:Math.abs(i.mean-dist)}))
+      .sort((a,b)=>a.diff-b.diff).slice(0,3);
+  }
+  const primary=top3(useMeans);
+  const secondary=Object.keys(m1).length>=3?top3(m2):null;
+  // HTML del popup
+  let html=`<div style="min-width:175px;font-family:sans-serif">`;
+  html+=`<div style="font-size:11px;color:#555;margin-bottom:6px">📍 Fins al green: <b>${dist}m</b></div>`;
+  if(primary.length===0){
+    html+=`<div style="font-size:11px;color:#999">Sense dades suficients</div>`;
+  } else {
+    html+=`<div style="font-size:10px;font-weight:700;color:#1a3a1a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">${srcLbl}</div>`;
+    primary.forEach((it,idx)=>{
+      const big=idx===0;
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;${big?'font-size:15px;font-weight:800':'font-size:12px;opacity:.72'}">`;
+      html+=`<span>${big?'🏌️ ':''}${clubLabelShort(it.c)}</span>`;
+      html+=`<span style="color:#1a3a1a">~${it.mean}m <span style="font-size:9px;color:#999">(${it.n}c)</span></span>`;
+      html+=`</div>`;
+    });
+    if(secondary&&secondary.length>0&&secondary[0].c!==primary[0].c){
+      html+=`<div style="margin-top:5px;padding-top:5px;border-top:1px solid #ddd;font-size:10px;color:#666">`;
+      html+=`<span style="font-weight:700">General (1a): </span>`;
+      html+=`${clubLabelShort(secondary[0].c)} ~${secondary[0].mean}m (${secondary[0].n}c)</div>`;
+    }
+  }
+  html+=`</div>`;
+  // Línia fins al green
+  gpsClubLine=L.polyline([[latlng.lat,latlng.lng],[grnPos.lat,grnPos.lon]],
+    {color:'#ff9800',weight:2,dashArray:'6 4',opacity:.85}).addTo(gpsMap);
+  // Marcador al punt clicat
+  gpsClubMarker=L.circleMarker([latlng.lat,latlng.lng],
+    {radius:9,color:'white',fillColor:'#ff9800',fillOpacity:1,weight:2})
+    .addTo(gpsMap).bindPopup(html,{minWidth:175}).openPopup();
 }
 
 function haversine(lat1,lon1,lat2,lon2){
@@ -779,8 +910,10 @@ function renderGPSHole(n){
   if(!gpsMap){
     gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false,preferCanvas:true});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
+    gpsMap.on('click',function(e){if(gpsClubMode) onClubMapClick(e.latlng);});
   } else {
     clearTrajectory();
+    clearClubRec();
     const toRemove=[];
     gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer)&&l!==gpsMyMarker)toRemove.push(l);});
     toRemove.forEach(l=>gpsMap.removeLayer(l));
@@ -826,7 +959,7 @@ function renderGPSHole(n){
   updateGpsLegend(clubsShown);
   const nShots=bounds.length-(holeGeo?((holeGeo.tee?1:0)+(greenPos?1:0)):0);
   const mapH=document.getElementById('gps-map').offsetHeight;
-  document.getElementById('gps-sub').textContent='v44 · '+nShots+'c · h'+mapH;
+  document.getElementById('gps-sub').textContent='v45 · '+nShots+'c · h'+mapH;
 }
 
 function reRenderShots(n){
