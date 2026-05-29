@@ -729,8 +729,10 @@ function buildShotMarker(shots,i,greenPos,targetGroup){
   let popup=`<b>${clubLabel(s.club)}</b>`;
   if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
   if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
-  // Etiqueta permanent (sempre visible)
-  const lbl=distTraveled!=null?`${clubLabelShort(s.club)} ${distTraveled}m`:clubLabelShort(s.club);
+  // Etiqueta permanent (sempre visible): pal · distància cop · distància green
+  let lbl=clubLabelShort(s.club);
+  if(distTraveled!=null) lbl+=` ${distTraveled}m`;
+  if(distGreen!=null)    lbl+=` · 🏌️${distGreen}m`;
   const mk=L.circleMarker([s.lat,s.lon],{radius:6,color:'rgba(255,255,255,0.75)',fillColor:col,fillOpacity:0.92,weight:2})
     .addTo(targetGroup)
     .bindPopup(popup)
