@@ -156,6 +156,9 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 .gps-legend{flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 14px;background:rgba(255,255,255,.28);border-top:1px solid var(--border)}
 .gps-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--dk)}
 .gps-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,.7)}
+/* etiquetes permanents de cop */
+.leaflet-tooltip.gps-label{background:rgba(0,0,0,.72);border:none;border-radius:10px;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.leaflet-tooltip.gps-label::before{display:none}
 
 /* ── ESTADÍSTIQUES GLOBALS ── */
 .stats-dates{flex-shrink:0;display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.1)}
@@ -342,7 +345,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=29',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=30',{updateViaCache:'none'})
     .then(r=>{ r.update(); })
     .catch(()=>{});
 }
@@ -621,10 +624,10 @@ function showTrajectory(shots,i){
   let nextPos=null;
   for(let j=i+1;j<shots.length;j++){if(shots[j].lat&&shots[j].lon){nextPos=[shots[j].lat,shots[j].lon];break;}}
   if(prevPos) gpsTrajectoryLayers.push(
-    L.polyline([prevPos,curr],{color:'#a8e6a8',weight:3,dashArray:'7 5',opacity:.95}).addTo(gpsMap)
+    L.polyline([prevPos,curr],{color:'#2ecc71',weight:4,dashArray:'8 5',opacity:1}).addTo(gpsMap)
   );
   if(nextPos) gpsTrajectoryLayers.push(
-    L.polyline([curr,nextPos],{color:'#ff9800',weight:3,opacity:.95}).addTo(gpsMap)
+    L.polyline([curr,nextPos],{color:'#ff9800',weight:4,opacity:1}).addTo(gpsMap)
   );
 }
 
@@ -690,13 +693,19 @@ function buildShotMarker(shots,i,greenPos,targetGroup){
   let distTraveled=null;
   for(let j=i+1;j<shots.length;j++){if(shots[j].lat&&shots[j].lon){distTraveled=haversine(s.lat,s.lon,shots[j].lat,shots[j].lon);break;}}
   const distGreen=greenPos?haversine(s.lat,s.lon,greenPos.lat,greenPos.lon):null;
+  // Popup detallat (clic)
   let popup=`<b>${clubLabel(s.club)}</b>`;
   if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
   if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
-  const mk=L.circleMarker([s.lat,s.lon],{radius:5,color:'rgba(255,255,255,0.6)',fillColor:col,fillOpacity:0.85,weight:1.5})
-    .addTo(targetGroup).bindPopup(popup);
+  // Etiqueta permanent (sempre visible)
+  const lbl=distTraveled!=null?`${clubLabelShort(s.club)} ${distTraveled}m`:clubLabelShort(s.club);
+  const mk=L.circleMarker([s.lat,s.lon],{radius:6,color:'rgba(255,255,255,0.75)',fillColor:col,fillOpacity:0.92,weight:2})
+    .addTo(targetGroup)
+    .bindPopup(popup)
+    .bindTooltip(lbl,{permanent:true,direction:'top',className:'gps-label',offset:[0,-8]});
   mk.on('click',function(){
-    if(gpsSelMarker===mk){clearTrajectory();return;}
+    mk.openPopup();
+    if(gpsSelMarker===mk){clearTrajectory();gpsSelMarker=null;return;}
     gpsSelMarker=mk; showTrajectory(shots,i);
   });
   return col;
@@ -739,6 +748,9 @@ function renderGPSHole(n){
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=(rd.shots&&rd.shots[n])||[];
+    // Línia de trajectòria (sota els marcadors)
+    const pts=shots.filter(s=>s.lat&&s.lon).map(s=>[s.lat,s.lon]);
+    if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
     shots.forEach((s,i)=>{
       if(!s.lat||!s.lon) return;
       bounds.push([s.lat,s.lon]);
@@ -761,6 +773,8 @@ function reRenderShots(n){
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=(rd.shots&&rd.shots[n])||[];
+    const pts=shots.filter(s=>s.lat&&s.lon).map(s=>[s.lat,s.lon]);
+    if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
     shots.forEach((s,i)=>{
       if(!s.lat||!s.lon) return;
       clubsShown.add(s.club);
@@ -806,20 +820,30 @@ function clubColor(type){
   if(!type) return '#aaa';
   if(type==='DRIVER') return '#e74c3c';
   if(type.startsWith('WOOD')) return '#e67e22';
-  if(type==='HYBRID') return '#f39c12';
+  if(type.startsWith('HYBRID')) return '#f39c12';
   if(type.startsWith('IRON')) return '#3498db';
   if(type.startsWith('WEDGE')) return '#9b59b6';
   if(type==='PUTTER') return '#1abc9c';
+  if(type==='CHIPPER') return '#16a085';
   return '#95a5a6';
 }
 
 function clubLabel(type){
   if(!type) return 'Desconegut';
-  const m={DRIVER:'Driver',WOOD_3:'Fusta 3',WOOD_5:'Fusta 5',HYBRID:'Híbrid',
+  const m={DRIVER:'Driver',WOOD_3:'Fusta 3',WOOD_5:'Fusta 5',HYBRID_4:'Hybrid 4',
     IRON_2:'Ferro 2',IRON_3:'Ferro 3',IRON_4:'Ferro 4',IRON_5:'Ferro 5',
     IRON_6:'Ferro 6',IRON_7:'Ferro 7',IRON_8:'Ferro 8',IRON_9:'Ferro 9',
-    WEDGE_PITCHING:'PW',WEDGE_GAP:'GW',WEDGE_SAND:'SW',WEDGE_LOB:'LW',PUTTER:'Putt'};
+    WEDGE_PITCHING:'PW',WEDGE_GAP:'GW',WEDGE_SAND:'SW',WEDGE_LOB:'LW',
+    WEDGE_BY_LOFT:'W (loft)',WEDGE_UTILITY:'UW',CHIPPER:'Chipper',PUTTER:'Putt'};
   return m[type]||type;
+}
+function clubLabelShort(type){
+  if(!type) return '?';
+  const m={DRIVER:'D',WOOD_3:'F3',WOOD_5:'F5',HYBRID_4:'H4',
+    IRON_2:'2i',IRON_3:'3i',IRON_4:'4i',IRON_5:'5i',IRON_6:'6i',IRON_7:'7i',IRON_8:'8i',IRON_9:'9i',
+    WEDGE_PITCHING:'PW',WEDGE_GAP:'GW',WEDGE_SAND:'SW',WEDGE_LOB:'LW',
+    WEDGE_BY_LOFT:'W',WEDGE_UTILITY:'UW',CHIPPER:'Ch',PUTTER:'P'};
+  return m[type]||type.replace(/_/g,'').substring(0,5);
 }
 
 // ── ESTADÍSTIQUES GLOBALS ──
