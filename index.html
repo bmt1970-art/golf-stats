@@ -785,37 +785,49 @@ function clubStatsMeans(stats){
 function onClubMapClick(latlng){
   if(!gpsMap) return;
   const n=gpsHole;
-  // Obtenir posició del green
+  // Obtenir posicions del green (front, middle) des de COURSE_GEO
   const cgH=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
-  let grnPos=null;
-  if(cgH&&cgH.green&&cgH.green.middle) grnPos=cgH.green.middle;
-  else{
+  let frontPos=null, middlePos=null;
+  if(cgH&&cgH.green){
+    if(cgH.green.front)  frontPos=cgH.green.front;
+    if(cgH.green.middle) middlePos=cgH.green.middle;
+  }
+  // Fallback: un sol punt genèric
+  if(!frontPos&&!middlePos){
     let hg=null;
     Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])hg=rd.holeGeo[n];});
-    if(hg&&hg.green&&hg.green.lat) grnPos=hg.green;
+    if(hg&&hg.green&&hg.green.lat){ frontPos=hg.green; middlePos=hg.green; }
   }
   clearClubRec();
-  if(!grnPos){
+  if(!frontPos&&!middlePos){
     gpsClubMarker=L.circleMarker([latlng.lat,latlng.lng],{radius:9,color:'white',fillColor:'#ff9800',fillOpacity:1,weight:2})
       .addTo(gpsMap).bindPopup('<b>Sense dades del green</b>').openPopup();
     return;
   }
-  const dist=haversine(latlng.lat,latlng.lng,grnPos.lat,grnPos.lon);
-  // Estadístiques: mateix camp 2 anys | tots els camps 1 any
+  // Distàncies
+  const distFront =frontPos ?haversine(latlng.lat,latlng.lng,frontPos.lat, frontPos.lon) :null;
+  const distMiddle=middlePos?haversine(latlng.lat,latlng.lng,middlePos.lat,middlePos.lon):null;
+  // Recomanació basada en distància a l'entrada (front)
+  const recDist=distFront!==null?distFront:distMiddle;
   const m1=clubStatsMeans(buildClubDistances(curCourse.name,2));
   const m2=clubStatsMeans(buildClubDistances(null,1));
   const useMeans=Object.keys(m1).length>=3?m1:m2;
   const srcLbl=Object.keys(m1).length>=3?'Camp (2a)':'General (1a)';
   function top3(means){
     return Object.entries(means)
-      .map(([c,i])=>({c,mean:i.mean,n:i.n,diff:Math.abs(i.mean-dist)}))
+      .map(([c,i])=>({c,mean:i.mean,n:i.n,diff:Math.abs(i.mean-recDist)}))
       .sort((a,b)=>a.diff-b.diff).slice(0,3);
   }
   const primary=top3(useMeans);
   const secondary=Object.keys(m1).length>=3?top3(m2):null;
   // HTML del popup
-  let html=`<div style="min-width:175px;font-family:sans-serif">`;
-  html+=`<div style="font-size:11px;color:#555;margin-bottom:6px">📍 Fins al green: <b>${dist}m</b></div>`;
+  let html=`<div style="min-width:185px;font-family:sans-serif">`;
+  // Distàncies entrada / centre
+  html+=`<div style="font-size:12px;margin-bottom:6px;line-height:1.6">`;
+  if(distFront!==null)  html+=`<div>🟢 Entrada green: <b>${distFront}m</b></div>`;
+  if(distMiddle!==null&&distMiddle!==distFront) html+=`<div style="opacity:.75">⚪ Centre green: <b>${distMiddle}m</b></div>`;
+  html+=`</div>`;
+  // Recomanació
   if(primary.length===0){
     html+=`<div style="font-size:11px;color:#999">Sense dades suficients</div>`;
   } else {
@@ -834,13 +846,14 @@ function onClubMapClick(latlng){
     }
   }
   html+=`</div>`;
-  // Línia fins al green
-  gpsClubLine=L.polyline([[latlng.lat,latlng.lng],[grnPos.lat,grnPos.lon]],
+  // Línia fins a l'entrada del green (referència de la recomanació)
+  const lineTarget=frontPos||middlePos;
+  gpsClubLine=L.polyline([[latlng.lat,latlng.lng],[lineTarget.lat,lineTarget.lon]],
     {color:'#ff9800',weight:2,dashArray:'6 4',opacity:.85}).addTo(gpsMap);
   // Marcador al punt clicat
   gpsClubMarker=L.circleMarker([latlng.lat,latlng.lng],
     {radius:9,color:'white',fillColor:'#ff9800',fillOpacity:1,weight:2})
-    .addTo(gpsMap).bindPopup(html,{minWidth:175}).openPopup();
+    .addTo(gpsMap).bindPopup(html,{minWidth:185}).openPopup();
 }
 
 function haversine(lat1,lon1,lat2,lon2){
