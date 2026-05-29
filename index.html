@@ -734,16 +734,9 @@ function buildShotMarker(shots,i,greenPos,targetGroup){
   if(prevDist!=null)     popup+=`<br>↩️ Cop anterior: <b>${clubLabel(prevClub)} ${prevDist}m</b>`;
   if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
   if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
-  // Etiqueta permanent: [pal anterior Xm ▶] pal actual Xm · 🏌️Xm
-  let lbl='';
-  if(prevClub&&prevDist) lbl+=`${clubLabelShort(prevClub)} ${prevDist}m ▶ `;
-  lbl+=clubLabelShort(s.club);
-  if(distTraveled!=null) lbl+=` ${distTraveled}m`;
-  if(distGreen!=null)    lbl+=` · 🏌️${distGreen}m`;
-  const mk=L.circleMarker([s.lat,s.lon],{radius:6,color:'rgba(255,255,255,0.75)',fillColor:col,fillOpacity:0.92,weight:2})
+  const mk=L.circleMarker([s.lat,s.lon],{radius:7,color:'rgba(255,255,255,0.75)',fillColor:col,fillOpacity:0.92,weight:2})
     .addTo(targetGroup)
-    .bindPopup(popup)
-    .bindTooltip(lbl,{permanent:true,direction:'top',className:'gps-label',offset:[0,-8]});
+    .bindPopup(popup);
   mk.on('click',function(){
     mk.openPopup();
     if(gpsSelMarker===mk){clearTrajectory();gpsSelMarker=null;return;}
