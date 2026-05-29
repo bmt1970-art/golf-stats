@@ -1033,13 +1033,15 @@ function reRenderShots(n){
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
-    const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
-    if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
-    shots.forEach((s,i)=>{
-      if(!s.lat||!s.lon||!clubVisible(s.club)) return;
-      clubsShown.add(s.club);
-      buildShotMarker(shots,i,greenPos,gpsShotsGroup);
-    });
+    if(!gpsHideAllShots){
+      const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
+      if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
+      shots.forEach((s,i)=>{
+        if(!s.lat||!s.lon||!clubVisible(s.club)) return;
+        clubsShown.add(s.club);
+        buildShotMarker(shots,i,greenPos,gpsShotsGroup);
+      });
+    }
   });
   updateGpsLegend(clubsShown);
 }
