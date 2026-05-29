@@ -345,8 +345,16 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=37',{updateViaCache:'none'})
-    .then(r=>{ r.update(); })
+  navigator.serviceWorker.register('./sw.js?v=43',{updateViaCache:'none'})
+    .then(r=>{
+      r.update();
+      r.addEventListener('updatefound',()=>{
+        const nw=r.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='activated') location.reload();
+        });
+      });
+    })
     .catch(()=>{});
 }
 
@@ -658,10 +666,16 @@ function openGPSMap(){
   if(!gpsCourseData) return;
   gpsHole=1;
   document.getElementById('gps-title').textContent=curCourse.name;
-  document.getElementById('gps-sub').textContent='Mapa GPS';
+  document.getElementById('gps-sub').textContent='Mapa GPS · v43';
   buildGpsFilter();
   go('s-gps','s-rounds');
-  setTimeout(()=>renderGPSHole(gpsHole),450);
+  setTimeout(()=>{
+    try{
+      renderGPSHole(gpsHole);
+    }catch(e){
+      document.getElementById('gps-sub').textContent='ERROR: '+e.message;
+    }
+  },450);
 }
 
 function closeGPS(){
@@ -728,8 +742,20 @@ function renderGPSHole(n){
   const si=holeGeo&&holeGeo.si!=null?' · HCP '+holeGeo.si:'';
   document.getElementById('gps-hp').textContent=holeGeo?`Par ${par}${si}`:'Sense dades de forat';
 
+  // ── 1. Recollir coordenades sense afegir marcadors ──
+  const bounds=[];
+  const greenPos=(holeGeo&&holeGeo.green&&holeGeo.green.lat)?holeGeo.green:null;
+  if(holeGeo&&holeGeo.tee&&holeGeo.tee.lat){bounds.push([holeGeo.tee.lat,holeGeo.tee.lon]);}
+  if(greenPos){bounds.push([greenPos.lat,greenPos.lon]);}
+  Object.entries(gpsCourseData).forEach(([id,rd])=>{
+    if(!gpsSelectedRounds.has(id)) return;
+    const shots=(rd.shots&&rd.shots[n])||[];
+    shots.forEach(s=>{if(s.lat&&s.lon)bounds.push([s.lat,s.lon]);});
+  });
+
+  // ── 2. Crear/netejar mapa i establir vista PRIMER ──
   if(!gpsMap){
-    gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false});
+    gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false,preferCanvas:true});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
   } else {
     clearTrajectory();
@@ -737,37 +763,35 @@ function renderGPSHole(n){
     gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer)&&l!==gpsMyMarker)toRemove.push(l);});
     toRemove.forEach(l=>gpsMap.removeLayer(l));
   }
+  gpsMap.invalidateSize();
+  if(bounds.length) gpsMap.fitBounds(bounds,{padding:[30,30],animate:false});
 
+  // ── 3. Ara afegir marcadors (mapa ja té vista establerta) ──
   gpsShotsGroup=L.layerGroup().addTo(gpsMap);
-  const bounds=[];
-  const greenPos=(holeGeo&&holeGeo.green&&holeGeo.green.lat)?holeGeo.green:null;
-
   if(holeGeo&&holeGeo.tee&&holeGeo.tee.lat){
-    const t=holeGeo.tee; bounds.push([t.lat,t.lon]);
+    const t=holeGeo.tee;
     L.circleMarker([t.lat,t.lon],{radius:8,color:'white',fillColor:'#2ecc71',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Sortida</b>');
   }
   if(greenPos){
-    bounds.push([greenPos.lat,greenPos.lon]);
     L.circleMarker([greenPos.lat,greenPos.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
   }
-
   const clubsShown=new Set();
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=(rd.shots&&rd.shots[n])||[];
-    // Línia de trajectòria (sota els marcadors)
     const pts=shots.filter(s=>s.lat&&s.lon).map(s=>[s.lat,s.lon]);
-    if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
+    if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5}).addTo(gpsShotsGroup);
     shots.forEach((s,i)=>{
       if(!s.lat||!s.lon) return;
-      bounds.push([s.lat,s.lon]);
       clubsShown.add(s.club);
       buildShotMarker(shots,i,greenPos,gpsShotsGroup);
     });
   });
 
-  if(bounds.length) gpsMap.fitBounds(bounds,{padding:[30,30]});
   updateGpsLegend(clubsShown);
+  const nShots=bounds.length-(holeGeo?((holeGeo.tee?1:0)+(greenPos?1:0)):0);
+  const mapH=document.getElementById('gps-map').offsetHeight;
+  document.getElementById('gps-sub').textContent='v43 · '+nShots+'c · h'+mapH;
 }
 
 function reRenderShots(n){
