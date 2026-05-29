@@ -730,8 +730,8 @@ function buildShotMarker(shots,i,greenPos,targetGroup){
   for(let j=i+1;j<shots.length;j++){if(shots[j].lat&&shots[j].lon){distTraveled=haversine(s.lat,s.lon,shots[j].lat,shots[j].lon);break;}}
   const distGreen=greenPos?haversine(s.lat,s.lon,greenPos.lat,greenPos.lon):null;
   // Popup detallat (clic)
-  let popup=`<b>${clubLabel(s.club)}</b>`;
-  if(prevDist!=null)     popup+=`<br>↩️ Cop anterior: <b>${clubLabel(prevClub)} ${prevDist}m</b>`;
+  let popup=`<b>${clubLabelShort(s.club)}</b>`;
+  if(prevDist!=null)     popup+=`<br>↩️ Anterior: <b>${clubLabelShort(prevClub)} ${prevDist}m</b>`;
   if(distTraveled!=null) popup+=`<br>📏 Distància: <b>${distTraveled}m</b>`;
   if(distGreen!=null)    popup+=`<br>🏳️ Fins al green: <b>${distGreen}m</b>`;
   const mk=L.circleMarker([s.lat,s.lon],{radius:7,color:'rgba(255,255,255,0.75)',fillColor:col,fillOpacity:0.92,weight:2})
@@ -846,7 +846,7 @@ function reRenderShots(n){
 function updateGpsLegend(clubsShown){
   let h=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#2ecc71"></div>Sortida</div>`;
   h+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:#f1c40f"></div>Green</div>`;
-  clubsShown.forEach(cl=>{h+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:${clubColor(cl)}"></div>${clubLabel(cl)}</div>`;});
+  clubsShown.forEach(cl=>{h+=`<div class="gps-leg-item"><div class="gps-leg-dot" style="background:${clubColor(cl)}"></div>${clubLabelShort(cl)}</div>`;});
   document.getElementById('gps-legend').innerHTML=h;
 }
 
@@ -898,8 +898,10 @@ function clubLabel(type){
 }
 function clubLabelShort(type){
   if(!type) return '?';
-  const m={DRIVER:'D',WOOD_3:'F3',WOOD_5:'F5',HYBRID_4:'H4',
-    IRON_2:'2i',IRON_3:'3i',IRON_4:'4i',IRON_5:'5i',IRON_6:'6i',IRON_7:'7i',IRON_8:'8i',IRON_9:'9i',
+  const m={DRIVER:'D',
+    WOOD_3:'3W',WOOD_5:'5W',WOOD_7:'7W',
+    HYBRID_3:'3H',HYBRID_4:'4H',HYBRID_5:'5H',
+    IRON_2:'2I',IRON_3:'3I',IRON_4:'4I',IRON_5:'5I',IRON_6:'6I',IRON_7:'7I',IRON_8:'8I',IRON_9:'9I',
     WEDGE_PITCHING:'PW',WEDGE_GAP:'GW',WEDGE_SAND:'SW',WEDGE_LOB:'LW',
     WEDGE_BY_LOFT:'W',WEDGE_UTILITY:'UW',CHIPPER:'Ch',PUTTER:'P'};
   return m[type]||type.replace(/_/g,'').substring(0,5);
