@@ -156,9 +156,10 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 .gps-legend{flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 14px;background:rgba(255,255,255,.28);border-top:1px solid var(--border)}
 .gps-leg-item{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--dk)}
 .gps-leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(255,255,255,.7)}
-.gps-toolbar{flex-shrink:0;display:flex;gap:8px;padding:5px 12px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.08)}
-.gps-tool-btn{display:flex;align-items:center;gap:5px;padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:var(--dk);-webkit-tap-highlight-color:transparent;transition:background .18s,color .18s,border-color .18s}
+.gps-toolbar{flex-shrink:0;display:flex;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.08)}
+.gps-tool-btn{display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:var(--dk);-webkit-tap-highlight-color:transparent;transition:background .18s,color .18s,border-color .18s}
 .gps-tool-btn.active{background:var(--g4);color:white;border-color:var(--g4)}
+.gps-tool-btn.hidden-filter{background:rgba(231,76,60,.15);color:#c0392b;border-color:#e74c3c;text-decoration:line-through}
 #gps-map.club-mode{cursor:crosshair!important}
 #gps-map.club-mode .leaflet-interactive{cursor:crosshair!important}
 /* etiquetes permanents de cop */
@@ -265,6 +266,9 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
   </div>
   <div class="gps-toolbar">
     <button id="btn-club-rec" class="gps-tool-btn" onclick="toggleClubMode()">🏌️ Pal recomanat</button>
+    <button id="btn-hide-putt" class="gps-tool-btn" onclick="toggleShotFilter('putt')">P/Ch</button>
+    <button id="btn-hide-wedge" class="gps-tool-btn" onclick="toggleShotFilter('wedge')">Wedge</button>
+    <button id="btn-hide-iron" class="gps-tool-btn" onclick="toggleShotFilter('iron')">Ferro</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
@@ -627,6 +631,7 @@ let gpsTrajectoryLayers=[], gpsSelMarker=null;
 let gpsShotsGroup=null, gpsSelectedRounds=new Set();
 let gpsWatchId=null, gpsMyMarker=null;
 let gpsClubMode=false, gpsClubMarker=null, gpsClubLine=null;
+let gpsHidePutts=false, gpsHideWedges=false, gpsHideIrons=false;
 
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
@@ -695,9 +700,12 @@ function closeGPS(){
   if(gpsMap){
     const dead=gpsMap;
     gpsMyMarker=null; gpsClubMarker=null; gpsClubLine=null; gpsMap=null;
-    gpsClubMode=false;
+    gpsClubMode=false; gpsHidePutts=false; gpsHideWedges=false; gpsHideIrons=false;
     const cbtn=document.getElementById('btn-club-rec');
     if(cbtn) cbtn.classList.remove('active');
+    ['btn-hide-putt','btn-hide-wedge','btn-hide-iron'].forEach(id=>{
+      const b=document.getElementById(id); if(b) b.classList.remove('hidden-filter');
+    });
     const mapEl=document.getElementById('gps-map');
     if(mapEl) mapEl.classList.remove('club-mode');
     setTimeout(()=>dead.remove(),350);
@@ -724,6 +732,28 @@ function filterGpsShots(shots){
     }
     return true;
   });
+}
+
+// ── FILTRES DE CLUBS ──
+const WEDGE_CLUBS=new Set(['WEDGE_PITCHING','WEDGE_GAP','WEDGE_SAND','WEDGE_LOB','WEDGE_BY_LOFT','WEDGE_UTILITY','CHIPPER']);
+
+function clubVisible(club){
+  if(!club) return true;
+  if(gpsHidePutts&&club==='PUTTER') return false;
+  if(gpsHidePutts&&club==='CHIPPER') return false;
+  if(gpsHideWedges&&WEDGE_CLUBS.has(club)) return false;
+  if(gpsHideIrons&&club.startsWith('IRON_')) return false;
+  return true;
+}
+
+function toggleShotFilter(type){
+  if(type==='putt')  gpsHidePutts =!gpsHidePutts;
+  if(type==='wedge') gpsHideWedges=!gpsHideWedges;
+  if(type==='iron')  gpsHideIrons =!gpsHideIrons;
+  document.getElementById('btn-hide-putt') .classList.toggle('hidden-filter',gpsHidePutts);
+  document.getElementById('btn-hide-wedge').classList.toggle('hidden-filter',gpsHideWedges);
+  document.getElementById('btn-hide-iron') .classList.toggle('hidden-filter',gpsHideIrons);
+  reRenderShots(gpsHole);
 }
 
 // ── PAL RECOMANAT ──
@@ -960,10 +990,10 @@ function renderGPSHole(n){
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
-    const pts=shots.filter(s=>s.lat&&s.lon).map(s=>[s.lat,s.lon]);
+    const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
     if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5}).addTo(gpsShotsGroup);
     shots.forEach((s,i)=>{
-      if(!s.lat||!s.lon) return;
+      if(!s.lat||!s.lon||!clubVisible(s.club)) return;
       clubsShown.add(s.club);
       buildShotMarker(shots,i,greenPos,gpsShotsGroup);
     });
@@ -985,10 +1015,10 @@ function reRenderShots(n){
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
-    const pts=shots.filter(s=>s.lat&&s.lon).map(s=>[s.lat,s.lon]);
+    const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
     if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
     shots.forEach((s,i)=>{
-      if(!s.lat||!s.lon) return;
+      if(!s.lat||!s.lon||!clubVisible(s.club)) return;
       clubsShown.add(s.club);
       buildShotMarker(shots,i,greenPos,gpsShotsGroup);
     });
