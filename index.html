@@ -336,6 +336,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script src="scorecards.js"></script>
 <script src="full_courses.js"></script>
 <script src="gps_all.js"></script>
+<script src="course_geo.js"></script>
 <script src="clubs.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -345,7 +346,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=43',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=44',{updateViaCache:'none'})
     .then(r=>{
       r.update();
       r.addEventListener('updatefound',()=>{
@@ -666,7 +667,7 @@ function openGPSMap(){
   if(!gpsCourseData) return;
   gpsHole=1;
   document.getElementById('gps-title').textContent=curCourse.name;
-  document.getElementById('gps-sub').textContent='Mapa GPS · v43';
+  document.getElementById('gps-sub').textContent='Mapa GPS · v44';
   buildGpsFilter();
   go('s-gps','s-rounds');
   setTimeout(()=>{
@@ -784,7 +785,20 @@ function renderGPSHole(n){
     const t=holeGeo.tee;
     L.circleMarker([t.lat,t.lon],{radius:8,color:'white',fillColor:'#2ecc71',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Sortida</b>');
   }
-  if(greenPos){
+  // Punts del green: front/middle/back des de COURSE_GEO
+  const cg=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
+  if(cg&&cg.green){
+    const gOpts={color:'white',fillColor:'#00c853',fillOpacity:1,weight:2};
+    const gSmall={...gOpts,radius:6};
+    const gBig={...gOpts,radius:9};
+    L.circleMarker([cg.green.front.lat,cg.green.front.lon],gSmall)
+      .addTo(gpsMap).bindTooltip('Entrada',{permanent:false}).bindPopup('<b>Green — Entrada</b>');
+    L.circleMarker([cg.green.middle.lat,cg.green.middle.lon],gBig)
+      .addTo(gpsMap).bindTooltip('Centre',{permanent:false}).bindPopup('<b>Green — Centre</b>');
+    L.circleMarker([cg.green.back.lat,cg.green.back.lon],gSmall)
+      .addTo(gpsMap).bindTooltip('Final',{permanent:false}).bindPopup('<b>Green — Final</b>');
+  } else if(greenPos){
+    // Fallback: un sol punt groc
     L.circleMarker([greenPos.lat,greenPos.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
   }
   const clubsShown=new Set();
@@ -803,7 +817,7 @@ function renderGPSHole(n){
   updateGpsLegend(clubsShown);
   const nShots=bounds.length-(holeGeo?((holeGeo.tee?1:0)+(greenPos?1:0)):0);
   const mapH=document.getElementById('gps-map').offsetHeight;
-  document.getElementById('gps-sub').textContent='v43 · '+nShots+'c · h'+mapH;
+  document.getElementById('gps-sub').textContent='v44 · '+nShots+'c · h'+mapH;
 }
 
 function reRenderShots(n){
