@@ -822,7 +822,42 @@ function clubStatsMeans(stats){
   return means;
 }
 
-function onClubMapClick(latlng){
+// ── VENT (Open-Meteo, gratuït, sense API key) ──
+async function fetchWind(lat,lon){
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=auto&forecast_days=1`;
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),5000);
+    const r=await fetch(url,{signal:ctrl.signal});
+    clearTimeout(tid);
+    const d=await r.json();
+    return{speed:d.current.wind_speed_10m, dir:d.current.wind_direction_10m};
+  }catch(e){return null;}
+}
+
+// Bearing (graus 0-360) de punt1 cap a punt2
+function calcBearing(lat1,lon1,lat2,lon2){
+  const dL=(lon2-lon1)*Math.PI/180;
+  const r1=lat1*Math.PI/180, r2=lat2*Math.PI/180;
+  const y=Math.sin(dL)*Math.cos(r2);
+  const x=Math.cos(r1)*Math.sin(r2)-Math.sin(r1)*Math.cos(r2)*Math.cos(dL);
+  return(Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
+// Component de vent al llarg del cop (+ = cua, - = cara)
+function windComp(speedMs,windFromDeg,shotBearingDeg){
+  const windTo=(windFromDeg+180)%360;
+  const diff=((windTo-shotBearingDeg+540)%360)-180;
+  return speedMs*Math.cos(diff*Math.PI/180);
+}
+
+// Fletxa i nom compass del vent (d'on ve)
+function windLabel(deg){
+  const n=['N','NE','E','SE','S','SO','O','NO'];
+  return n[Math.round(deg/45)%8];
+}
+
+async function onClubMapClick(latlng){
   if(!gpsMap) return;
   const n=gpsHole;
   // Obtenir posicions del green (front, middle) des de COURSE_GEO
@@ -832,7 +867,6 @@ function onClubMapClick(latlng){
     if(cgH.green.front)  frontPos=cgH.green.front;
     if(cgH.green.middle) middlePos=cgH.green.middle;
   }
-  // Fallback: un sol punt genèric
   if(!frontPos&&!middlePos){
     let hg=null;
     Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])hg=rd.holeGeo[n];});
@@ -844,15 +878,45 @@ function onClubMapClick(latlng){
       .addTo(gpsMap).bindPopup('<b>Sense dades del green</b>').openPopup();
     return;
   }
-  // Distàncies
-  const distFront =frontPos ?haversine(latlng.lat,latlng.lng,frontPos.lat, frontPos.lon) :null;
+  // Línia + marcador provisional mentre carrega el vent
+  const lineTarget=frontPos||middlePos;
+  gpsClubLine=L.polyline([[latlng.lat,latlng.lng],[lineTarget.lat,lineTarget.lon]],
+    {color:'#ff9800',weight:2,dashArray:'6 4',opacity:.85}).addTo(gpsMap);
+  gpsClubMarker=L.circleMarker([latlng.lat,latlng.lng],{radius:9,color:'white',fillColor:'#ff9800',fillOpacity:1,weight:2})
+    .addTo(gpsMap).bindPopup('<div style="padding:4px">💨 Obtenint vent...</div>').openPopup();
+  // Fetch vent
+  const wind=await fetchWind(latlng.lat,latlng.lng);
+  // Distàncies base
+  const distFront =frontPos ?haversine(latlng.lat,latlng.lng,frontPos.lat, frontPos.lon):null;
   const distMiddle=middlePos?haversine(latlng.lat,latlng.lng,middlePos.lat,middlePos.lon):null;
-  // Estadístiques: mateix camp 2 anys | tots els camps 1 any
+  // Ajust de vent (factor: 3m per m/s)
+  const WIND_FACTOR=3;
+  let adjFront=distFront, adjMiddle=distMiddle, windHtml='';
+  if(wind&&wind.speed>0.5){
+    if(frontPos&&distFront!==null){
+      const brg=calcBearing(latlng.lat,latlng.lng,frontPos.lat,frontPos.lon);
+      const comp=windComp(wind.speed,wind.dir,brg);
+      const adj=Math.round(-comp*WIND_FACTOR);
+      adjFront=distFront+adj;
+    }
+    if(middlePos&&distMiddle!==null&&distMiddle!==distFront){
+      const brg=calcBearing(latlng.lat,latlng.lng,middlePos.lat,middlePos.lon);
+      const comp=windComp(wind.speed,wind.dir,brg);
+      adjMiddle=distMiddle+Math.round(-comp*WIND_FACTOR);
+    }
+    // Descripció del vent (usem el bearing cap a l'entrada)
+    const brgRef=frontPos?calcBearing(latlng.lat,latlng.lng,frontPos.lat,frontPos.lon):0;
+    const comp=frontPos?windComp(wind.speed,wind.dir,brgRef):0;
+    const adj=Math.round(-comp*WIND_FACTOR);
+    const tipus=Math.abs(comp)>0.8?(comp<0?'Vent de cara':'Vent de cua'):'Vent creuat';
+    const adjTxt=Math.abs(adj)>=1?(adj>0?' +'+adj+'m':' '+adj+'m'):'';
+    windHtml=`<div style="font-size:11px;padding:3px 0 5px;border-bottom:1px solid #ddd;margin-bottom:5px;color:#1a3a1a">💨 ${wind.speed.toFixed(1)} m/s ${windLabel(wind.dir)} · <b>${tipus}${adjTxt}</b></div>`;
+  }
+  // Estadístiques
   const m1=clubStatsMeans(buildClubDistances(curCourse.name,2));
   const m2=clubStatsMeans(buildClubDistances(null,1));
   const useMeans=Object.keys(m1).length>=3?m1:m2;
   const srcLbl=Object.keys(m1).length>=3?'Basat en aquest camp (2 anys)':'Basat en tots els camps (1 any)';
-  // Troba el millor pal per a una distància donada
   function bestClub(means,d){
     if(d===null) return null;
     let best=null,bestDiff=Infinity;
@@ -862,44 +926,36 @@ function onClubMapClick(latlng){
     });
     return best;
   }
-  const recFront =bestClub(useMeans,distFront);
-  const recMiddle=bestClub(useMeans,distMiddle);
-  // HTML del popup — dues files: entrada i centre
-  let html=`<div style="min-width:200px;font-family:sans-serif">`;
+  const recFront =bestClub(useMeans,adjFront);
+  const recMiddle=bestClub(useMeans,adjMiddle);
+  // HTML del popup
+  function fmtDist(real,adj){
+    if(adj===null) return '';
+    const diff=adj-real;
+    if(Math.abs(diff)<1) return `<b>${real}m</b>`;
+    return `<b>${real}m</b> <span style="font-size:10px;color:${diff>0?'#c0392b':'#27ae60'}">${diff>0?'+':''}${diff}m</span>`;
+  }
+  let html=`<div style="min-width:205px;font-family:sans-serif">`;
+  html+=windHtml;
   html+=`<div style="font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">${srcLbl}</div>`;
-  // Fila entrada
   if(distFront!==null){
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee">`;
-    html+=`<div style="font-size:11px;color:#1a3a1a;font-weight:700">🟢 Entrada<br><span style="font-size:13px">${distFront}m</span></div>`;
+    html+=`<div style="font-size:11px;color:#1a3a1a;font-weight:700">🟢 Entrada<br>${fmtDist(distFront,adjFront)}</div>`;
     if(recFront) html+=`<div style="text-align:right;font-size:16px;font-weight:800">🏌️ ${clubLabelShort(recFront.c)}<br><span style="font-size:10px;color:#555;font-weight:400">~${recFront.mean}m (${recFront.n}c)</span></div>`;
     else         html+=`<div style="font-size:11px;color:#999">—</div>`;
     html+=`</div>`;
   }
-  // Fila centre
-  if(distMiddle!==null){
-    const showCentre=distMiddle!==distFront;
-    const recC=showCentre?recMiddle:null;
-    const dC=showCentre?distMiddle:null;
-    if(showCentre){
-      html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">`;
-      html+=`<div style="font-size:11px;color:#555;font-weight:700">⚪ Centre<br><span style="font-size:13px">${dC}m</span></div>`;
-      if(recC) html+=`<div style="text-align:right;font-size:16px;font-weight:800">🏌️ ${clubLabelShort(recC.c)}<br><span style="font-size:10px;color:#555;font-weight:400">~${recC.mean}m (${recC.n}c)</span></div>`;
-      else     html+=`<div style="font-size:11px;color:#999">—</div>`;
-      html+=`</div>`;
-    }
+  if(distMiddle!==null&&distMiddle!==distFront){
+    html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">`;
+    html+=`<div style="font-size:11px;color:#555;font-weight:700">⚪ Centre<br>${fmtDist(distMiddle,adjMiddle)}</div>`;
+    if(recMiddle) html+=`<div style="text-align:right;font-size:16px;font-weight:800">🏌️ ${clubLabelShort(recMiddle.c)}<br><span style="font-size:10px;color:#555;font-weight:400">~${recMiddle.mean}m (${recMiddle.n}c)</span></div>`;
+    else          html+=`<div style="font-size:11px;color:#999">—</div>`;
+    html+=`</div>`;
   }
-  if(!recFront&&!recMiddle){
-    html+=`<div style="font-size:11px;color:#999;padding-top:4px">Sense dades suficients</div>`;
-  }
+  if(!recFront&&!recMiddle) html+=`<div style="font-size:11px;color:#999;padding-top:4px">Sense dades suficients</div>`;
   html+=`</div>`;
-  // Línia fins a l'entrada del green (referència de la recomanació)
-  const lineTarget=frontPos||middlePos;
-  gpsClubLine=L.polyline([[latlng.lat,latlng.lng],[lineTarget.lat,lineTarget.lon]],
-    {color:'#ff9800',weight:2,dashArray:'6 4',opacity:.85}).addTo(gpsMap);
-  // Marcador al punt clicat
-  gpsClubMarker=L.circleMarker([latlng.lat,latlng.lng],
-    {radius:9,color:'white',fillColor:'#ff9800',fillOpacity:1,weight:2})
-    .addTo(gpsMap).bindPopup(html,{minWidth:185}).openPopup();
+  // Actualitzar popup (ja estava obert amb "Obtenint vent...")
+  if(gpsClubMarker) gpsClubMarker.setPopupContent(html).openPopup();
 }
 
 function haversine(lat1,lon1,lat2,lon2){
