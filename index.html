@@ -359,7 +359,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
   });
-  navigator.serviceWorker.register('./sw.js?v=45',{updateViaCache:'none'})
+  navigator.serviceWorker.register('./sw.js?v=46',{updateViaCache:'none'})
     .then(r=>{
       r.update();
       r.addEventListener('updatefound',()=>{
@@ -691,7 +691,7 @@ function openGPSMap(){
   if(!gpsCourseData) return;
   gpsHole=1;
   document.getElementById('gps-title').textContent=curCourse.name;
-  document.getElementById('gps-sub').textContent='Mapa GPS · v45';
+  document.getElementById('gps-sub').textContent='Mapa GPS · v46';
   buildGpsFilter();
   go('s-gps','s-rounds');
   setTimeout(()=>{
@@ -1076,7 +1076,7 @@ function renderGPSHole(n){
   updateGpsLegend(clubsShown);
   const nShots=bounds.length-(holeGeo?((holeGeo.tee?1:0)+(greenPos?1:0)):0);
   const mapH=document.getElementById('gps-map').offsetHeight;
-  document.getElementById('gps-sub').textContent='v45 · '+nShots+'c · h'+mapH;
+  document.getElementById('gps-sub').textContent='v46 · '+nShots+'c · h'+mapH;
 }
 
 function reRenderShots(n){
