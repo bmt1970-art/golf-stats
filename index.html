@@ -270,6 +270,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button id="btn-hide-wedge" class="gps-tool-btn" onclick="toggleShotFilter('wedge')">Wedge</button>
     <button id="btn-hide-iron" class="gps-tool-btn" onclick="toggleShotFilter('iron')">Ferro</button>
     <button id="btn-hide-all" class="gps-tool-btn" onclick="toggleHideAllShots()">✕ Cops</button>
+    <button id="btn-relleu" class="gps-tool-btn" onclick="toggleRelleu()" style="display:none">⛳ Pendents</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
@@ -350,6 +351,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script src="full_courses.js"></script>
 <script src="gps_all.js"></script>
 <script src="course_geo.js"></script>
+<script src="green_relief.js"></script>
 <script src="clubs.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -634,6 +636,41 @@ let gpsWatchId=null, gpsMyMarker=null;
 let gpsClubMode=false, gpsClubMarker=null, gpsClubLine=null;
 let gpsHidePutts=false, gpsHideWedges=false, gpsHideIrons=false;
 let gpsHideAllShots=false;
+let gpsRelleu=false, gpsRelleuGroup=null;
+
+// ── Relleu del green (GREEN_RELIEF): corbes cada 5 cm i fletxes de caiguda ──
+function relleuForat(n){
+  return typeof GREEN_RELIEF!=='undefined'&&curCourse&&GREEN_RELIEF[curCourse.name]&&GREEN_RELIEF[curCourse.name][n];
+}
+function colorPendent(p){return p<1.5?'#2ecc71':p<3?'#f1c40f':p<5?'#ff9800':'#e74c3c';}
+function drawRelleu(n){
+  if(gpsRelleuGroup){gpsMap.removeLayer(gpsRelleuGroup);gpsRelleuGroup=null;}
+  const r=relleuForat(n);
+  if(!gpsRelleu||!r) return;
+  gpsRelleuGroup=L.layerGroup().addTo(gpsMap);
+  r.lines.forEach(c=>{
+    const fort=c.cm%20===0;
+    L.polyline(c.p,{color:'#ffffff',weight:fort?1.6:0.8,opacity:fort?0.85:0.55,interactive:false}).addTo(gpsRelleuGroup);
+  });
+  // fletxa: longitud proporcional al pendent fins al 5 % (1,6 m), cap on baixa la bola
+  r.arrows.forEach(([lat,lon,rumb,p])=>{
+    const len=Math.min(p,5)/5*1.6+0.3, a=rumb*Math.PI/180;
+    const kx=1/(111320*Math.cos(lat*Math.PI/180)), ky=1/111320;
+    const pt=(d,ang)=>[lat+Math.cos(ang)*d*ky,lon+Math.sin(ang)*d*kx];
+    const cua=pt(-len/2,a), cap=pt(len/2,a);
+    const hl=Math.max(0.35,len*0.35);
+    const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx];
+    const e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
+    const col=colorPendent(p);
+    L.polyline([cua,cap],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
+    L.polyline([e1,cap,e2],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
+  });
+}
+function toggleRelleu(){
+  gpsRelleu=!gpsRelleu;
+  document.getElementById('btn-relleu').classList.toggle('active',gpsRelleu);
+  renderGPSHole(gpsHole);
+}
 
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
@@ -1009,6 +1046,12 @@ function renderGPSHole(n){
     distStr=' · '+d+'m';
   }
   document.getElementById('gps-hp').textContent=holeGeo?`Par ${par}${si}${distStr}`:'Sense dades de forat';
+  const relleu=relleuForat(n);
+  document.getElementById('btn-relleu').style.display=relleu?'':'none';
+  if(gpsRelleu&&relleu){
+    const s=relleu.stats;
+    document.getElementById('gps-hp').textContent+=` · Green ${s.pm}% · cau al ${s.rumb}`;
+  }
 
   // ── 1. Recollir coordenades sense afegir marcadors ──
   const bounds=[];
@@ -1032,9 +1075,12 @@ function renderGPSHole(n){
     const toRemove=[];
     gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer)&&l!==gpsMyMarker)toRemove.push(l);});
     toRemove.forEach(l=>gpsMap.removeLayer(l));
+    gpsRelleuGroup=null;
   }
   gpsMap.invalidateSize();
-  if(bounds.length) gpsMap.fitBounds(bounds,{padding:[30,30],animate:false});
+  const cgZoom=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
+  if(gpsRelleu&&relleu&&cgZoom&&cgZoom.green&&cgZoom.green.contour) gpsMap.fitBounds(cgZoom.green.contour,{padding:[20,20],animate:false});
+  else if(bounds.length) gpsMap.fitBounds(bounds,{padding:[30,30],animate:false});
 
   // ── 3. Ara afegir marcadors (mapa ja té vista establerta) ──
   gpsShotsGroup=L.layerGroup().addTo(gpsMap);
@@ -1062,6 +1108,7 @@ function renderGPSHole(n){
     // Fallback: un sol punt groc
     L.circleMarker([greenPos.lat,greenPos.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
   }
+  drawRelleu(n);
   const clubsShown=new Set();
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
