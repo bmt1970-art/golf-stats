@@ -642,15 +642,34 @@ let gpsRelleu=false, gpsRelleuGroup=null;
 function relleuForat(n){
   return typeof GREEN_RELIEF!=='undefined'&&curCourse&&GREEN_RELIEF[curCourse.name]&&GREEN_RELIEF[curCourse.name][n];
 }
-function colorPendent(p){return p<1.5?'#2ecc71':p<3?'#f1c40f':p<5?'#ff9800':'#e74c3c';}
+let gpsRelleuLlegenda=null;
+function llegendaRelleu(show){
+  if(!gpsRelleuLlegenda){
+    gpsRelleuLlegenda=L.control({position:'bottomright'});
+    gpsRelleuLlegenda.onAdd=()=>{
+      const d=L.DomUtil.create('div');
+      d.style.cssText='background:rgba(255,255,255,.85);padding:4px 7px;border-radius:8px;font:700 10px sans-serif;color:#333';
+      d.innerHTML='Pendent<div style="width:110px;height:9px;margin:3px 0 1px;border-radius:3px;'+
+        'background:linear-gradient(90deg,#006837,#66bd63,#ffffbf,#fdae61,#d73027,#a50026)"></div>'+
+        '<div style="display:flex;justify-content:space-between"><span>0</span><span>2</span><span>4</span><span>6 %</span></div>';
+      return d;
+    };
+  }
+  if(show) gpsRelleuLlegenda.addTo(gpsMap); else gpsRelleuLlegenda.remove();
+}
 function drawRelleu(n){
   if(gpsRelleuGroup){gpsMap.removeLayer(gpsRelleuGroup);gpsRelleuGroup=null;}
   const r=relleuForat(n);
+  llegendaRelleu(!!(gpsRelleu&&r));
   if(!gpsRelleu||!r) return;
   gpsRelleuGroup=L.layerGroup().addTo(gpsMap);
+  // mapa de pendents 0-6 % (verd a vermell), com les fitxes del green
+  // capa propia per sota de l'overlayPane (400), perque no tapi corbes, fletxes ni cops
+  if(!gpsMap.getPane('relleu')){gpsMap.createPane('relleu').style.zIndex=350;}
+  if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:0.8,interactive:false,pane:'relleu'}).addTo(gpsRelleuGroup);
   r.lines.forEach(c=>{
     const fort=c.cm%20===0;
-    L.polyline(c.p,{color:'#ffffff',weight:fort?1.6:0.8,opacity:fort?0.85:0.55,interactive:false}).addTo(gpsRelleuGroup);
+    L.polyline(c.p,{color:'#1a1a1a',weight:fort?1.4:0.7,opacity:fort?0.8:0.5,interactive:false}).addTo(gpsRelleuGroup);
   });
   // fletxa: longitud proporcional al pendent fins al 5 % (1,6 m), cap on baixa la bola
   r.arrows.forEach(([lat,lon,rumb,p])=>{
@@ -661,7 +680,7 @@ function drawRelleu(n){
     const hl=Math.max(0.35,len*0.35);
     const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx];
     const e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
-    const col=colorPendent(p);
+    const col='#0d1b6f';
     L.polyline([cua,cap],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
     L.polyline([e1,cap,e2],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
   });
@@ -1093,7 +1112,7 @@ function renderGPSHole(n){
   if(cg&&cg.green){
     // Contorn del green (Golf Pad), si el camp el té digitalitzat
     if(cg.green.contour&&cg.green.contour.length>2){
-      L.polygon(cg.green.contour,{color:'#ffffff',weight:2,opacity:0.9,fillColor:'#00e676',fillOpacity:0.3,interactive:false}).addTo(gpsMap);
+      L.polygon(cg.green.contour,{color:'#ffffff',weight:2,opacity:0.9,fillColor:'#00e676',fillOpacity:(gpsRelleu&&relleu)?0:0.3,interactive:false}).addTo(gpsMap);
     }
     const gOpts={color:'white',fillColor:'#00c853',fillOpacity:1,weight:2};
     const gSmall={...gOpts,radius:6};
