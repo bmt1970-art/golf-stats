@@ -1045,6 +1045,10 @@ function renderGPSHole(n){
   // Punts del green: front/middle/back des de COURSE_GEO
   const cg=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
   if(cg&&cg.green){
+    // Contorn del green (Golf Pad), si el camp el té digitalitzat
+    if(cg.green.contour&&cg.green.contour.length>2){
+      L.polygon(cg.green.contour,{color:'#ffffff',weight:2,opacity:0.9,fillColor:'#00e676',fillOpacity:0.3,interactive:false}).addTo(gpsMap);
+    }
     const gOpts={color:'white',fillColor:'#00c853',fillOpacity:1,weight:2};
     const gSmall={...gOpts,radius:6};
     const gBig={...gOpts,radius:9};
