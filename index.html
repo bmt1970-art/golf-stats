@@ -668,7 +668,7 @@ function buildGpsFilter(){
   const entries=Object.entries(gpsCourseData).sort((a,b)=>b[1].date.localeCompare(a[1].date));
   gpsSelectedRounds=new Set(entries.map(([id])=>id));
   const html=entries.map(([id,rd])=>
-    `<button class="gps-chip on" id="gchip-${id}" onclick="toggleGpsRound('${id}')">${fmtDateShort(rd.date)}${rd.gross?' ('+rd.gross+')':''}</button>`
+    `<button class="gps-chip on" id="gchip-${id}" onclick="toggleGpsRound('${id}')">${fmtDateShort(rd.date)}${rd.gross?' ('+rd.gross+(rd.pts!=null?' · '+rd.pts+'p':'')+')':''}</button>`
   ).join('');
   document.getElementById('gps-filter').innerHTML=html;
 }
