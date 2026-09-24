@@ -166,7 +166,7 @@ function obre(g,auto){
   dibuixaPutt();
 }
 function estatDe(g){
-  if(!estat[g.clau]) estat[g.clau]={forat:[g.green.middle.lat,g.green.middle.lon],bola:[g.green.front.lat,g.green.front.lon],exemple:true};
+  if(!estat[g.clau]) estat[g.clau]={forat:[g.green.middle.lat,g.green.middle.lon],bola:puttBolaExemple(g.green),exemple:true};
   return estat[g.clau];
 }
 

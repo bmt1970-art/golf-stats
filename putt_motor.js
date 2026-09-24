@@ -5,6 +5,13 @@
 // perque passi pel centre del forat i, si no hi entres, s'aturés PUTT_PASSA m mes enlla.
 const PUTT_G=9.81*5/7, PUTT_V0=1.83, PUTT_PASSA=0.40, PUTT_DT=0.004;
 
+// Bola d'exemple en obrir un green: a l'entrada, si en te. Els greens de practiques no en tenen
+// (no hi ha sortida ni direccio d'arribada): a mig cami del centre al punt mes al sud del contorn.
+function puttBolaExemple(g){
+  if(g.front) return [g.front.lat,g.front.lon];
+  const s=g.contour.reduce((a,p)=>p[0]<a[0]?p:a);
+  return [g.middle.lat+(s[0]-g.middle.lat)*0.6,g.middle.lon+(s[1]-g.middle.lon)*0.6];
+}
 const puttEN=(S,ll)=>[(ll[1]-S.o[1])*S.k[0],(ll[0]-S.o[0])*S.k[1]];
 const puttLL=(S,p)=>[S.o[0]+p[1]/S.k[1],S.o[1]+p[0]/S.k[0]];
 function puttBilin(S,a,x,y){

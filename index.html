@@ -744,7 +744,7 @@ function puttEstat(n){
   const clau=curCourse.name+'|'+n;
   if(!puttPos[clau]){
     const cg=COURSE_GEO[curCourse.name][n].green;
-    puttPos[clau]={forat:[cg.middle.lat,cg.middle.lon],bola:[cg.front.lat,cg.front.lon],exemple:true};
+    puttPos[clau]={forat:[cg.middle.lat,cg.middle.lon],bola:puttBolaExemple(cg),exemple:true};
   }
   return puttPos[clau];
 }
@@ -1284,11 +1284,12 @@ function renderGPSHole(n){
     const gSmall={...gOpts,radius:6};
     const gBig={...gOpts,radius:9};
     if(!(puttOn&&superf)){   // en mode putt taparien la bola i el forat
-    L.circleMarker([cg.green.front.lat,cg.green.front.lon],gSmall)
+    // els greens de practiques no tenen entrada ni final (no hi ha sortida)
+    if(cg.green.front) L.circleMarker([cg.green.front.lat,cg.green.front.lon],gSmall)
       .addTo(gpsMap).bindTooltip('Entrada',{permanent:false}).bindPopup('<b>Green — Entrada</b>');
     L.circleMarker([cg.green.middle.lat,cg.green.middle.lon],gBig)
       .addTo(gpsMap).bindTooltip('Centre',{permanent:false}).bindPopup('<b>Green — Centre</b>');
-    L.circleMarker([cg.green.back.lat,cg.green.back.lon],gSmall)
+    if(cg.green.back) L.circleMarker([cg.green.back.lat,cg.green.back.lon],gSmall)
       .addTo(gpsMap).bindTooltip('Final',{permanent:false}).bindPopup('<b>Green — Final</b>');
     }
   } else if(greenPos){
