@@ -383,6 +383,14 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script>
 let curCourse=null, curHole=1, curType=null, statsType=null;
 
+// Camps amb geometria a COURSE_GEO i cap partida encara (p. ex. un camp nou o un green de
+// pràctiques): s'afegeixen a la llista amb 0 partides perquè es puguin obrir al mapa GPS.
+if(typeof COURSE_GEO!=='undefined'){
+  Object.keys(COURSE_GEO).forEach(nom=>{
+    if(!GOLF_DATA.some(c=>c.name===nom)) GOLF_DATA.push({name:nom,type:'full',rounds:0,holes:{},roundsList:[],nomesGeo:true});
+  });
+}
+
 if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
     regs.forEach(r=>{ if(!r.scope.includes(location.origin)) r.unregister(); });
@@ -458,7 +466,7 @@ function openCourse(encoded){
   }
 
   const gpsBtn=document.getElementById('btn-gps');
-  gpsBtn.style.display=(typeof GPS_DATA!=='undefined'&&GPS_DATA[curCourse.name])?'flex':'none';
+  gpsBtn.style.display=((typeof GPS_DATA!=='undefined'&&GPS_DATA[curCourse.name])||(typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]))?'flex':'none';
 
   go('s-rounds','s-courses');
 }
@@ -960,8 +968,8 @@ function toggleGpsRound(id){
 }
 
 function openGPSMap(){
-  if(typeof GPS_DATA==='undefined') return;
-  gpsCourseData=GPS_DATA[curCourse.name];
+  gpsCourseData=(typeof GPS_DATA!=='undefined'&&GPS_DATA[curCourse.name])||
+    ((typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name])?{}:null);
   if(!gpsCourseData) return;
   gpsHole=1;
   document.getElementById('gps-title').textContent=curCourse.name;
@@ -999,9 +1007,26 @@ function closeGPS(){
   go('s-rounds','s-gps',true);
 }
 
+// Forats del mapa GPS: els de COURSE_GEO si el camp en té (el de pràctiques en té 1); si no, 18
+function gpsNForats(){
+  const cg=typeof COURSE_GEO!=='undefined'&&curCourse&&COURSE_GEO[curCourse.name];
+  return cg?Math.max(...Object.keys(cg).map(Number)):18;
+}
+
+// Dades del forat (par, HCP, sortida, green): de les partides; si el camp no en té, de COURSE_GEO
+function gpsHoleGeo(n){
+  let hg=null;
+  Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])hg=rd.holeGeo[n];});
+  if(hg) return hg;
+  const cg=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
+  if(!cg) return null;
+  return {par:cg.par,si:cg.si,tee:cg.tee||null,
+          green:cg.green&&cg.green.middle?{lat:cg.green.middle.lat,lon:cg.green.middle.lon}:null};
+}
+
 function gpsChH(d){
   const n=gpsHole+d;
-  if(n<1||n>18) return;
+  if(n<1||n>gpsNForats()) return;
   gpsHole=n;
   renderGPSHole(gpsHole);
 }
@@ -1270,11 +1295,10 @@ function buildShotMarker(shots,i,greenPos,targetGroup){
 function renderGPSHole(n){
   gpsHole=n;
   document.getElementById('gps-prev').disabled=n===1;
-  document.getElementById('gps-next').disabled=n===18;
+  document.getElementById('gps-next').disabled=n>=gpsNForats();
   document.getElementById('gps-hn').textContent='Forat '+n;
 
-  let holeGeo=null;
-  Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])holeGeo=rd.holeGeo[n];});
+  const holeGeo=gpsHoleGeo(n);
   const par=holeGeo?holeGeo.par:'?';
   const si=holeGeo&&holeGeo.si!=null?' · HCP '+holeGeo.si:'';
   const cgHole=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
@@ -1377,8 +1401,7 @@ function renderGPSHole(n){
 function reRenderShots(n){
   if(!gpsShotsGroup||!gpsMap) return;
   gpsShotsGroup.clearLayers();
-  let holeGeo=null;
-  Object.values(gpsCourseData).forEach(rd=>{if(rd.holeGeo&&rd.holeGeo[n])holeGeo=rd.holeGeo[n];});
+  const holeGeo=gpsHoleGeo(n);
   const greenPos=(holeGeo&&holeGeo.green&&holeGeo.green.lat)?holeGeo.green:null;
   const clubsShown=new Set();
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
