@@ -705,7 +705,7 @@ function drawRelleu(n){
   // mapa de pendents 0-6 % (verd a vermell), com les fitxes del green
   // capa propia per sota de l'overlayPane (400), perque no tapi corbes, fletxes ni cops
   if(!gpsMap.getPane('relleu')){gpsMap.createPane('relleu').style.zIndex=350;}
-  if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:0.8,interactive:false,pane:'relleu'}).addTo(gpsRelleuGroup);
+  if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:0.6,interactive:false,pane:'relleu'}).addTo(gpsRelleuGroup);
   r.lines.forEach(c=>{
     const fort=c.cm%20===0;
     L.polyline(c.p,{color:'#1a1a1a',weight:fort?1.4:0.7,opacity:fort?0.8:0.5,interactive:false}).addTo(gpsRelleuGroup);
