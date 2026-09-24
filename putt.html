@@ -99,16 +99,17 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
 const A_PROP=120;            // m: si ets a menys d'aixo d'un green, s'obre sol
 const CANVI=35;              // m: si t'allunyes aixi del green obert i un altre es mes a prop, avisa
 let mapa, capaRelleu=null, capaPutt=null, jo=null, joCercle=null;
-let actual=null, modeAct='forat', fletxes=false, posJo=null, avisat=null;
+let actual=null, modeAct='forat', posJo=null, avisat=null;
+let fletxes=(()=>{try{return localStorage.getItem('golf-putt-fletxes')!=='0';}catch(e){return true;}})();   // de sortida, visibles
 let stimpV=(()=>{try{return +localStorage.getItem('golf-putt-stimp')||9;}catch(e){return 9;}})();
 const estat={};               // clau -> {bola, forat, gps, exemple}
 
 // ── greens disponibles: els que tenen superficie; el 9 forats en surt una sola vegada ──
 function nomGreen(camp,n){
-  if(/Pràctiques/.test(camp)) return 'Green de pràctiques';
+  if(/pr[aà]ctiques/i.test(camp)) return 'Green de pràctiques';
   return 'Forat '+n;
 }
-function nomCamp(camp){ return camp.replace(/ - Pràctiques$/,''); }
+function nomCamp(camp){ return camp.replace(/\s*-\s*pr[aà]ctiques$/i,''); }
 const GREENS=[];
 (()=>{
   const vist=new Set();
@@ -178,11 +179,14 @@ function dibuixaRelleu(){
     const len=Math.min(pc,5)/5*1.6+.3,a=rumb*Math.PI/180,kx=1/(111320*Math.cos(lat*Math.PI/180)),ky=1/111320;
     const pt=(d,an)=>[lat+Math.cos(an)*d*ky,lon+Math.sin(an)*d*kx],cua=pt(-len/2,a),cap=pt(len/2,a),hl=Math.max(.35,len*.35);
     const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx],e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
-    L.polyline([cua,cap],{color:'#0d1b6f',weight:2.2,interactive:false}).addTo(capaRelleu);
-    L.polyline([e1,cap,e2],{color:'#0d1b6f',weight:2.2,interactive:false}).addTo(capaRelleu);
+    for(const [col,w] of [['#fff',5],['#0d1b6f',2.4]]){      // vora blanca perque es vegin sobre el mapa de pendents
+      L.polyline([cua,cap],{color:col,weight:w,opacity:col==='#fff'?.85:1,interactive:false}).addTo(capaRelleu);
+      L.polyline([e1,cap,e2],{color:col,weight:w,opacity:col==='#fff'?.85:1,lineJoin:'round',interactive:false}).addTo(capaRelleu);
+    }
   });
 }
-function toggleFletxes(){ fletxes=!fletxes; document.getElementById('b-fletxes').classList.toggle('on',fletxes); if(actual) dibuixaRelleu(); }
+function toggleFletxes(){ fletxes=!fletxes; try{localStorage.setItem('golf-putt-fletxes',fletxes?'1':'0');}catch(e){}
+  document.getElementById('b-fletxes').classList.toggle('on',fletxes); if(actual) dibuixaRelleu(); }
 
 // ── putt ──
 function mode(m){ modeAct=m; document.getElementById('m-forat').classList.toggle('on',m==='forat'); document.getElementById('m-bola').classList.toggle('on',m==='bola'); }
@@ -293,6 +297,7 @@ function triat(clau){ tancaTria(); obre(GREENS.find(g=>g.clau===clau),false); }
 // ── inici ──
 initMapa();
 stimp(0);
+document.getElementById('b-fletxes').classList.toggle('on',fletxes);
 if(!GREENS.length){ amagaInici(); document.getElementById('apunta').textContent='No hi ha cap green amb relleu.'; }
 else if(!navigator.geolocation){ sensePos('Aquest mòbil no dona la posició.'); }
 else {
