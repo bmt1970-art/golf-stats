@@ -59,6 +59,7 @@ html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px
 <div id="mapa"></div>
 
 <div class="dalt">
+  <button class="ico" onclick="surt()" title="Torna a Golf Stats" aria-label="Torna a Golf Stats">‹</button>
   <button class="nom" id="nom" onclick="obreTria()">—<small>Toca per canviar de green</small></button>
   <button class="ico" id="b-fletxes" onclick="toggleFletxes()" title="Fletxes de caiguda">➶</button>
   <button class="ico" onclick="bolaAqui(true)" title="La bola és on sóc">📍</button>
@@ -83,7 +84,10 @@ html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px
   <h2>Tria el green</h2>
   <div class="sub" id="tria-sub"></div>
   <div id="llista"></div>
-  <button class="bt" onclick="tancaTria()" id="tria-tanca" style="margin-top:8px">Tanca</button>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="bt" onclick="tancaTria()" id="tria-tanca" style="flex:1">Torna al green</button>
+    <button class="bt" onclick="surt()" style="flex:1">Surt a Golf Stats</button>
+  </div>
 </div>
 
 <div id="inici"><div class="gran">⛳</div><b>Putt</b><p id="inici-txt">Buscant la teva posició…</p></div>
@@ -292,6 +296,8 @@ function obreTria(sub){
     grups[c].map(g=>`<button class="gr" onclick="triat('${g.clau.replace(/'/g,"\\'")}')">${nomGreen(g.camp,g.n)}<span>${posJo?fM(dist(posJo,g.mig)):''}</span></button>`).join('')).join('');
 }
 function tancaTria(){ document.getElementById('tria').style.display='none'; }
+// una pagina web no es pot tancar sola: es torna a l'app principal (a pantalla completa no hi ha barra del navegador)
+function surt(){ location.href='index.html'; }
 function triat(clau){ tancaTria(); obre(GREENS.find(g=>g.clau===clau),false); }
 
 // ── inici ──
