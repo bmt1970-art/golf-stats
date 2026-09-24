@@ -53,6 +53,40 @@ html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px
 #inici .gran{font-size:54px}
 #inici p{color:var(--sub);margin:0}
 .leaflet-control-attribution{display:none}
+/* calibratge */
+#cal{position:fixed;inset:0;z-index:1250;background:var(--fons);display:none;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 12px)}
+#cal .cap{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+#cal h2{margin:0;font-size:20px;flex:1}
+#cal-cos{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding-bottom:10px}
+.bloc{background:rgba(255,255,255,.07);border-radius:12px;padding:12px;margin:10px 0}
+.bloc h3{margin:0 0 8px;font-size:15px}
+.bloc p,.bloc li{color:var(--sub);font-size:13.5px;line-height:1.45;margin:4px 0}
+.bloc ol{padding-left:20px;margin:6px 0}
+.bloc b{color:var(--txt)}
+details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
+.camps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.camps label{display:flex;flex-direction:column;gap:4px;color:var(--sub);font-size:12px}
+.camps input,.camps select,#c-nota{background:rgba(255,255,255,.1);border:0;border-radius:9px;color:var(--txt);padding:9px 10px;font:15px inherit;width:100%}
+.camps select option{color:#222}
+.camps .ample{grid-column:1/-1}
+.sn{display:flex;gap:6px}
+.sn .seg{flex:0 0 auto}
+.sn input{flex:1;min-width:0}
+.lect{font-size:13.5px;color:var(--txt);line-height:1.5}
+.lect span{color:var(--sub)}
+.graella{display:grid;grid-template-columns:auto repeat(3,1fr);gap:4px;font-size:12.5px;margin-top:6px}
+.graella div{background:rgba(255,255,255,.06);border-radius:6px;padding:6px 4px;text-align:center;color:var(--sub)}
+.graella .ok{background:rgba(120,200,120,.28);color:var(--txt);font-weight:700}
+.graella .t{background:none;font-weight:700;color:var(--txt)}
+.reg{border-top:1px solid rgba(255,255,255,.1);padding:8px 0;font-size:13px;color:var(--sub);display:flex;gap:8px;align-items:flex-start}
+.reg div{flex:1}
+.reg b{color:var(--txt)}
+.reg button{border:0;background:rgba(255,255,255,.1);color:var(--txt);border-radius:8px;padding:5px 9px}
+.fila2{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.fila2 .bt{flex:1;min-width:30%}
+.bt.prim{background:var(--or);color:#222}
+#cal-msg{color:var(--or);font-size:13px;min-height:18px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -62,6 +96,7 @@ html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px
   <button class="ico" onclick="surt()" title="Torna a Golf Stats" aria-label="Torna a Golf Stats">‹</button>
   <button class="nom" id="nom" onclick="obreTria()">—<small>Toca per canviar de green</small></button>
   <button class="ico" id="b-fletxes" onclick="toggleFletxes()" title="Fletxes de caiguda">➶</button>
+  <button class="ico" onclick="obreCal()" title="Calibratge" aria-label="Calibratge">📋</button>
   <button class="ico" onclick="bolaAqui(true)" title="La bola és on sóc">📍</button>
 </div>
 <div id="avis"></div>
@@ -90,6 +125,80 @@ html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px
   </div>
 </div>
 
+<div id="cal">
+  <div class="cap"><h2>Calibratge</h2><button class="bt" onclick="tancaCal()">Torna al green</button></div>
+  <div id="cal-cos">
+    <details class="bloc" id="cal-guia">
+      <summary>Com es fa (guia)</summary>
+      <p>Es tracta de comprovar que, amb la velocitat real del green, les línies de l'app són les bones. Es fa <b>un cop</b>, al green de pràctiques, i serveix per a tots els greens. Compta una hora.</p>
+      <h3 style="margin-top:10px">Porta</h3>
+      <p>L'Stimpmeter (o demana l'Stimp del dia al greenkeeper), 10 tees o monedes, una cinta mètrica i 5 boles iguals.</p>
+      <h3 style="margin-top:10px">1. Velocitat del green</h3>
+      <ol>
+        <li>A la part més plana del green, llança 3 boles amb l'Stimpmeter cap a una banda i 3 cap a l'altra. Mesura on s'aturen des del peu de l'Stimpmeter.</li>
+        <li>Posa les dues mitjanes a la calculadora de sota i toca <b>«Fes-la servir»</b>. Si el terreny és pla, posa la mateixa mitjana a les dues.</li>
+      </ol>
+      <h3 style="margin-top:10px">2. Nou putts de prova</h3>
+      <p>Al voltant d'un forat, un de <b>curt</b> (2-3 m), un de <b>mitjà</b> (5-6 m) i un de <b>llarg</b> (9-10 m) per a cada tipus: <b>pujada</b>, <b>baixada</b> i <b>caiguda lateral</b> (millor si n'hi ha de les dues direccions). La graella de sota et diu quins et falten.</p>
+      <h3 style="margin-top:10px">3. Per a cada putt</h3>
+      <ol>
+        <li>Al mapa, marca el <b>Forat</b> i la <b>Bola</b> tocant-los. <b>No facis servir 📍</b>: el GPS falla 3-5 m, més que el putt.</li>
+        <li>Mesura amb la cinta la distància de la bola al forat. L'app l'ha de donar amb menys de 30 cm de diferència; si no, torna a marcar.</li>
+        <li>Clava un tee al <b>punt d'apuntar</b> que diu l'app (el cercle groc): tants cm a l'esquerra o a la dreta del forat, a la mateixa distància.</li>
+        <li>Tira <b>5 boles</b> cap al tee, amb la força perquè passin uns 40 cm el forat. Amb l'Stimpmeter com a llançador (putts de 3-6 m) la dada surt més neta.</li>
+        <li>Mira <b>per on passa cada bola</b> en arribar al forat (a l'esquerra o a la dreta, mirant des de la bola) i <b>on s'atura</b> (curta o llarga). Fes la mitjana de les 5.</li>
+        <li>Obre aquesta pantalla (📋), comprova que la lectura és la del putt i toca <b>«Desa el putt»</b>.</li>
+      </ol>
+      <h3 style="margin-top:10px">4. En acabar</h3>
+      <p>Toca <b>«Copia»</b> o <b>«Baixa el CSV»</b> i passa-m'ho. El resum de sota ja t'avança si les boles cauen menys o més del que diu l'app.</p>
+      <p><b>Compte:</b> els putts fallats pel cop (mal dirigits, massa forts) no diuen res del model: per això són 5 boles i la mitjana. Si una bola se't n'ha anat clarament, no la comptis.</p>
+    </details>
+
+    <div class="bloc">
+      <h3>Velocitat del green (Stimpmeter)</h3>
+      <div class="camps">
+        <label>Mitjana cap a una banda (m)<input id="c-s1" type="number" inputmode="decimal" step="0.01" min="0" placeholder="2,80"></label>
+        <label>Mitjana cap a l'altra (m)<input id="c-s2" type="number" inputmode="decimal" step="0.01" min="0" placeholder="2,60"></label>
+      </div>
+      <div id="c-stimp" class="lect" style="margin-top:8px"></div>
+      <div class="fila2"><button class="bt" onclick="calStimp(true)">Fes-la servir</button></div>
+    </div>
+
+    <div class="bloc">
+      <h3>Aquest putt</h3>
+      <div id="c-lect" class="lect"></div>
+      <div class="camps">
+        <label>Tipus<select id="c-tipus"><option value="pujada">Pujada</option><option value="baixada">Baixada</option><option value="lateral">Caiguda lateral</option></select></label>
+        <label>Com l'has tirat<select id="c-metode"><option value="ma">Amb el putter</option><option value="stimp">Amb l'Stimpmeter</option></select></label>
+        <label class="ample">Per on passen en arribar al forat (mitjana, cm)
+          <div class="sn"><div class="seg"><button id="c-le" onclick="calCosta('lat','E')">Esq</button><button id="c-ld" onclick="calCosta('lat','D')">Dre</button></div>
+          <input id="c-lat" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div></label>
+        <label class="ample">On s'aturen respecte del forat (mitjana, cm)
+          <div class="sn"><div class="seg"><button id="c-lc" onclick="calCosta('llarg','C')">Curta</button><button id="c-ll" onclick="calCosta('llarg','L')">Llarga</button></div>
+          <input id="c-llarg" type="number" inputmode="numeric" min="0" step="1" placeholder="40"></div></label>
+        <label>Boles tirades<input id="c-boles" type="number" inputmode="numeric" min="1" step="1" value="5"></label>
+        <label>Quantes han entrat<input id="c-dins" type="number" inputmode="numeric" min="0" step="1" value="0"></label>
+      </div>
+      <input id="c-nota" placeholder="Nota (opcional): vent, green moll, gra…" style="margin-top:8px">
+      <div class="fila2"><button class="bt prim" id="c-desa" onclick="calDesa()">Desa el putt</button></div>
+      <div id="cal-msg"></div>
+    </div>
+
+    <div class="bloc">
+      <h3>Putts fets</h3>
+      <div class="graella" id="c-graella"></div>
+      <div id="c-resum" class="lect" style="margin-top:10px"></div>
+      <div id="c-llista" style="margin-top:6px"></div>
+      <div class="fila2">
+        <button class="bt" onclick="calCopia()">Copia</button>
+        <button class="bt" onclick="calBaixa()">Baixa el CSV</button>
+        <button class="bt" id="c-comparteix" onclick="calComparteix()">Comparteix</button>
+      </div>
+      <div class="fila2"><button class="bt" id="c-esborra" onclick="calEsborraTot()">Esborra el registre</button></div>
+    </div>
+  </div>
+</div>
+
 <div id="inici"><div class="gran">⛳</div><b>Putt</b><p id="inici-txt">Buscant la teva posició…</p></div>
 
 <script src="course_geo.js"></script>
@@ -107,6 +216,7 @@ let actual=null, modeAct='forat', posJo=null, avisat=null;
 let fletxes=(()=>{try{return localStorage.getItem('golf-putt-fletxes')!=='0';}catch(e){return true;}})();   // de sortida, visibles
 let stimpV=(()=>{try{return +localStorage.getItem('golf-putt-stimp')||9;}catch(e){return 9;}})();
 const estat={};               // clau -> {bola, forat, gps, exemple}
+let lectura=null;             // la darrera lectura calculada (per al registre de calibratge)
 
 // ── greens disponibles: els que tenen superficie; el 9 forats en surt una sola vegada ──
 function nomGreen(camp,n){
@@ -199,6 +309,7 @@ function stimp(d){ stimpV=Math.max(6,Math.min(14,stimpV+d)); try{localStorage.se
 let torn=0;
 function dibuixaPutt(){
   document.getElementById('stimp-v').textContent=stimpV.toFixed(1).replace('.',',');
+  lectura=null;
   if(capaPutt){mapa.removeLayer(capaPutt);capaPutt=null;}
   const g=actual; if(!g) return;
   const S=puttSuperficie(g.camp,g.n); if(!S) return;
@@ -241,6 +352,10 @@ function dibuixaPutt(){
     const cau=dev*100<3?'recte':`cau ${fc(dev*100)} ${off>0?'cap a la dreta':'cap a l\'esquerra'}`;
     dd.innerHTML=`${fm(d)} · ${desn} · força d'un putt pla de <b>${fm(forca)}</b> · ${cau}`+
       (sol.m.vForat>1.3?' · <span class="av">arriba massa ràpida</span>':'')+(nota?`<br>${nota}`:'');
+    // signes: apunta + = a l'esquerra del forat; caiguda + = la bola cau cap a la dreta (mirant des de la bola)
+    lectura={camp:g.camp,n:g.n,green:nomGreen(g.camp,g.n),stimp:stimpV,bola:p.bola.slice(),forat:p.forat.slice(),
+      dist:+d.toFixed(2),desn:Math.round(dz),apunta:Math.round(off*100),forca:+forca.toFixed(2),
+      caiguda:Math.round(dev*100)*(off>0?1:-1),vForat:+sol.m.vForat.toFixed(2),gps:!!p.gps};
   },30);
 }
 
@@ -299,6 +414,121 @@ function tancaTria(){ document.getElementById('tria').style.display='none'; }
 // una pagina web no es pot tancar sola: es torna a l'app principal (a pantalla completa no hi ha barra del navegador)
 function surt(){ location.href='index.html'; }
 function triat(clau){ tancaTria(); obre(GREENS.find(g=>g.clau===clau),false); }
+
+// ── calibratge: registre de putts de prova (es desa al mobil; s'envia en CSV) ──
+const CAL_CLAU='golf-putt-calibratge';
+let cal=(()=>{try{return JSON.parse(localStorage.getItem(CAL_CLAU)||'[]');}catch(e){return [];}})();
+const calCost={lat:'E',llarg:'L'};
+const desaCal=()=>{try{localStorage.setItem(CAL_CLAU,JSON.stringify(cal));}catch(e){}};
+const n1=v=>(+v).toFixed(1).replace('.',',');
+const classeDist=d=>d<4?'curt':d<=7.5?'mitja':'llarg';
+function obreCal(){
+  document.getElementById('cal').style.display='flex';
+  if(!cal.length) document.getElementById('cal-guia').open=true;
+  if(lectura){                                   // tipus proposat a partir de la lectura
+    document.getElementById('c-tipus').value=Math.abs(lectura.caiguda)>=15&&Math.abs(lectura.desn)<=15?'lateral':lectura.desn>0?'pujada':'baixada';
+  }
+  calCosta('lat',calCost.lat); calCosta('llarg',calCost.llarg); calStimp(false); calPinta();
+}
+function tancaCal(){ document.getElementById('cal').style.display='none'; }
+function calCosta(q,v){
+  calCost[q]=v;
+  if(q==='lat'){ document.getElementById('c-le').classList.toggle('on',v==='E'); document.getElementById('c-ld').classList.toggle('on',v==='D'); }
+  else { document.getElementById('c-lc').classList.toggle('on',v==='C'); document.getElementById('c-ll').classList.toggle('on',v==='L'); }
+}
+function calStimp(aplica){
+  const a=parseFloat(document.getElementById('c-s1').value.replace(',','.')), b=parseFloat(document.getElementById('c-s2').value.replace(',','.'));
+  const o=document.getElementById('c-stimp');
+  if(!(a>0&&b>0)){ o.innerHTML=`<span>Ara l'app fa servir</span> ${n1(stimpV)} peus`; return; }
+  const m=2*a*b/(a+b), peus=m/0.3048;                    // correccio de pendent (formula de l'USGA)
+  o.innerHTML=`Stimp: <b>${m.toFixed(2).replace('.',',')} m</b> = <b>${n1(peus)} peus</b>`+(Math.abs(a-b)>0.3*Math.max(a,b)?' <span>· les dues bandes difereixen molt: busca una zona més plana</span>':'');
+  if(aplica){ stimpV=Math.round(Math.max(6,Math.min(14,peus))*10)/10; try{localStorage.setItem('golf-putt-stimp',stimpV);}catch(e){} dibuixaPutt();
+    calMsg(`Stimp posat a ${n1(stimpV)} peus.`); }
+}
+function calMsg(t){ const m=document.getElementById('cal-msg'); m.textContent=t; clearTimeout(calMsg.t); calMsg.t=setTimeout(()=>m.textContent='',5000); }
+function calDesa(){
+  if(!lectura){ calMsg('No hi ha cap lectura: torna al green, marca el forat i la bola i espera que surti on apuntar.'); return; }
+  const lat=parseFloat(document.getElementById('c-lat').value), llg=parseFloat(document.getElementById('c-llarg').value);
+  if(isNaN(lat)||isNaN(llg)){ calMsg('Posa per on passen les boles i on s\'aturen (0 si és al forat).'); return; }
+  const r={...lectura, data:new Date().toISOString(), tipus:document.getElementById('c-tipus').value,
+    metode:document.getElementById('c-metode').value,
+    lateral:Math.round(lat)*(calCost.lat==='E'?1:-1),           // + = passa per l'esquerra del forat
+    llargada:Math.round(llg)*(calCost.llarg==='L'?1:-1),        // + = llarga, - = curta
+    boles:+document.getElementById('c-boles').value||0, dins:+document.getElementById('c-dins').value||0,
+    nota:document.getElementById('c-nota').value.trim()};
+  cal.push(r); desaCal();
+  ['c-lat','c-llarg','c-nota'].forEach(i=>document.getElementById(i).value=''); document.getElementById('c-dins').value=0;
+  calMsg(`Desat (${cal.length}). Torna al green i marca el següent putt.`);
+  calPinta();
+}
+function calPinta(){
+  const L=lectura, e=document.getElementById('c-lect');
+  e.innerHTML=L?`<b>${L.green}</b> <span>· ${nomCamp(L.camp)}</span><br>${n1(L.dist)} m · ${Math.abs(L.desn)<1?'pla':(L.desn>0?'puja ':'baixa ')+Math.abs(L.desn)+' cm'} · `+
+    `apunta ${Math.abs(L.apunta)<3?'al centre':Math.abs(L.apunta)+' cm a '+(L.apunta>0?'l\'esquerra':'la dreta')} · força de ${n1(L.forca)} m · Stimp ${n1(L.stimp)}`+
+    (L.gps?'<br><span style="color:#ffb4a6">Bola situada pel GPS: marca-la tocant el mapa abans de desar.</span>':'')
+    :'<span>Encara no hi ha cap lectura. Torna al green, marca el forat i la bola, i espera que l\'app digui on apuntar.</span>';
+  document.getElementById('c-desa').disabled=!L;
+  // graella 3 x 3
+  const tip=[['pujada','Pujada'],['baixada','Baixada'],['lateral','Lateral']], dis=[['curt','Curt'],['mitja','Mitjà'],['llarg','Llarg']];
+  let g='<div class="t"></div>'+dis.map(d=>`<div class="t">${d[1]}</div>`).join('');
+  for(const [t,tn] of tip){ g+=`<div class="t">${tn}</div>`;
+    for(const [d] of dis){ const k=cal.filter(r=>r.tipus===t&&classeDist(r.dist)===d).length; g+=`<div class="${k?'ok':''}">${k||'–'}</div>`; } }
+  document.getElementById('c-graella').innerHTML=g;
+  // resum: banda alta = la banda cap on s'apunta (la bola ha caigut menys del previst)
+  const amb=cal.filter(r=>Math.abs(r.apunta)>=5);
+  const alt=amb.length?amb.reduce((s,r)=>s+r.lateral*Math.sign(r.apunta),0)/amb.length:null;
+  const llar=cal.length?cal.reduce((s,r)=>s+r.llargada,0)/cal.length:null;
+  let t='';
+  if(!cal.length) t='<span>Encara no has desat cap putt.</span>';
+  else {
+    t=`<b>${cal.length} ${cal.length===1?'putt desat':'putts desats'}</b>, ${cal.reduce((s,r)=>s+(r.boles||0),0)} boles. `;
+    if(alt!==null) t+=Math.abs(alt)<5?'La caiguda coincideix amb la de l\'app. ':
+      alt>0?`Les boles <b>cauen menys</b> del que diu l'app: passen de mitjana ${Math.round(alt)} cm per la banda alta. `:
+            `Les boles <b>cauen més</b> del que diu l'app: passen de mitjana ${Math.round(-alt)} cm per la banda baixa. `;
+    t+=llar-40>25?`Queden <b>llargues</b> (${Math.round(llar)} cm passat el forat, i n'haurien de ser 40): el green podria ser més ràpid que l'Stimp que has posat.`:
+       llar-40<-25?`Queden <b>curtes</b> (${Math.round(llar)} cm, i n'haurien de ser 40): el green podria ser més lent que l'Stimp que has posat.`:
+       'La força coincideix (les boles passen uns 40 cm).';
+    t+='<br><span>És orientatiu: la força i la direcció del cop també hi compten. Passa-me\'l i en faré l\'anàlisi.</span>';
+  }
+  document.getElementById('c-resum').innerHTML=t;
+  document.getElementById('c-llista').innerHTML=cal.map((r,i)=>`<div class="reg"><div><b>${i+1}. ${r.green}</b> · ${r.tipus} · ${n1(r.dist)} m · apunta ${r.apunta>0?r.apunta+' E':-r.apunta+' D'}<br>`+
+    `passen ${Math.abs(r.lateral)} cm ${r.lateral>=0?'esq':'dre'} · ${r.llargada>=0?'llarga ':'curta '}${Math.abs(r.llargada)} cm · ${r.boles} boles${r.dins?', '+r.dins+' a dins':''}${r.nota?' · '+r.nota:''}</div>`+
+    `<button onclick="calEsborra(${i})" aria-label="Esborra">✕</button></div>`).reverse().join('');
+  const sh=document.getElementById('c-comparteix'); sh.style.display=navigator.share?'':'none';
+}
+function calEsborra(i){ cal.splice(i,1); desaCal(); calPinta(); }
+function calEsborraTot(){
+  const b=document.getElementById('c-esborra');
+  if(!cal.length) return;
+  if(b.dataset.segur){ cal=[]; desaCal(); delete b.dataset.segur; b.textContent='Esborra el registre'; calPinta(); calMsg('Registre esborrat.'); return; }
+  b.dataset.segur='1'; b.textContent='Toca un altre cop per esborrar-ho tot';
+  setTimeout(()=>{ delete b.dataset.segur; b.textContent='Esborra el registre'; },4000);
+}
+function calCSV(){
+  const cap=['data','camp','green','forat','stimp_peus','metode','tipus','dist_m','desnivell_cm','apunta_cm_esq','forca_m','caiguda_cm_dreta',
+    'v_forat_ms','lateral_cm_esq','llargada_cm','boles','dins','bola_lat','bola_lon','forat_lat','forat_lon','nota'];
+  const q=v=>{const s=String(v??''); return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  return [cap.join(';')].concat(cal.map(r=>[r.data,r.camp,r.green,r.n,r.stimp,r.metode,r.tipus,r.dist,r.desn,r.apunta,r.forca,r.caiguda,
+    r.vForat,r.lateral,r.llargada,r.boles,r.dins,r.bola[0],r.bola[1],r.forat[0],r.forat[1],r.nota].map(q).join(';'))).join('\n');
+}
+async function calCopia(){
+  if(!cal.length){ calMsg('No hi ha res per copiar.'); return; }
+  try{ await navigator.clipboard.writeText(calCSV()); calMsg('Copiat. Enganxa-ho al xat amb Claude.'); }
+  catch(e){ calMsg('No s\'ha pogut copiar: fes servir «Baixa el CSV».'); }
+}
+function calBaixa(){
+  if(!cal.length){ calMsg('No hi ha res per baixar.'); return; }
+  const a=document.createElement('a'), d=new Date().toISOString().slice(0,10);
+  a.href=URL.createObjectURL(new Blob(['﻿'+calCSV()],{type:'text/csv;charset=utf-8'})); a.download=`calibratge_putt_${d}.csv`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
+}
+async function calComparteix(){
+  if(!cal.length){ calMsg('No hi ha res per compartir.'); return; }
+  const d=new Date().toISOString().slice(0,10), f=new File(['﻿'+calCSV()],`calibratge_putt_${d}.csv`,{type:'text/csv'});
+  try{ if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({files:[f],title:'Calibratge del putt'});
+       else await navigator.share({title:'Calibratge del putt',text:calCSV()}); }
+  catch(e){ if(e.name!=='AbortError') calMsg('No s\'ha pogut compartir: fes servir «Copia».'); }
+}
 
 // ── inici ──
 initMapa();
