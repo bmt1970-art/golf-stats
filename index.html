@@ -160,6 +160,15 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 .gps-tool-btn{display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:var(--dk);-webkit-tap-highlight-color:transparent;transition:background .18s,color .18s,border-color .18s}
 .gps-tool-btn.active{background:var(--g4);color:white;border-color:var(--g4)}
 .gps-tool-btn.hidden-filter{background:rgba(231,76,60,.15);color:#c0392b;border-color:#e74c3c;text-decoration:line-through}
+.putt-panel{flex-shrink:0;display:flex;flex-direction:column;gap:6px;padding:8px 12px 10px;border-top:1px solid var(--border);background:var(--card)}
+.putt-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.putt-stimp{margin-left:auto;display:flex;align-items:center;gap:4px;font-weight:800;color:var(--dk);font-variant-numeric:tabular-nums}
+.putt-stimp button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border);background:rgba(255,255,255,.15);color:var(--dk);font-size:16px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.putt-stimp small{font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px}
+.putt-apunta{font-size:18px;font-weight:800;color:var(--dk);line-height:1.2}
+.putt-apunta b{color:#e2472c}
+.putt-dades{font-size:12px;font-weight:600;color:var(--sub);line-height:1.35}
+.putt-dades .av{color:#c0392b}
 #gps-map.club-mode{cursor:crosshair!important}
 #gps-map.club-mode .leaflet-interactive{cursor:crosshair!important}
 /* etiquetes permanents de cop */
@@ -271,9 +280,25 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button id="btn-hide-iron" class="gps-tool-btn" onclick="toggleShotFilter('iron')">Ferro</button>
     <button id="btn-hide-all" class="gps-tool-btn" onclick="toggleHideAllShots()">✕ Cops</button>
     <button id="btn-relleu" class="gps-tool-btn" onclick="toggleRelleu()" style="display:none">⛳ Pendents</button>
+    <button id="btn-putt" class="gps-tool-btn" onclick="togglePutt()" style="display:none">🎯 Putt</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
+  <div class="putt-panel" id="putt-panel" style="display:none">
+    <div class="putt-row">
+      <button id="putt-m-bola" class="gps-tool-btn active" onclick="puttMode('bola')">⚪ Bola</button>
+      <button id="putt-m-forat" class="gps-tool-btn" onclick="puttMode('forat')">⛳ Forat</button>
+      <button id="putt-aqui" class="gps-tool-btn" onclick="puttBolaAqui()">📍 Bola aquí</button>
+      <div class="putt-stimp">
+        <button onclick="puttStimp(-0.5)" aria-label="Green més lent">−</button>
+        <span id="putt-stimp-v">9,0</span>
+        <button onclick="puttStimp(0.5)" aria-label="Green més ràpid">+</button>
+        <small>stimp</small>
+      </div>
+    </div>
+    <div class="putt-apunta" id="putt-apunta">Toca el green per situar la bola</div>
+    <div class="putt-dades" id="putt-dades"></div>
+  </div>
   <div class="gps-legend" id="gps-legend"></div>
 </div>
 
@@ -352,6 +377,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script src="gps_all.js"></script>
 <script src="course_geo.js"></script>
 <script src="green_relief.js"></script>
+<script src="green_surface.js"></script>
 <script src="clubs.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -691,6 +717,198 @@ function toggleRelleu(){
   renderGPSHole(gpsHole);
 }
 
+// ── PUTT: línia i força sobre la superfície LiDAR (GREEN_SURFACE) ──
+// La bola rodola: gravetat del pendent x 5/7 i fregament constant que surt de l'Stimpmeter
+// (la bola en surt a 1,83 m/s i roda stimp x 0,3048 m en pla). Es busca la direcció i la força
+// perquè passi pel centre del forat i, si no hi entrés, s'aturés PUTT_PASSA m més enllà.
+let puttOn=false, puttModeAct='bola', puttLayer=null;
+const puttPos={};                       // [camp|forat] -> {bola:[lat,lon], forat:[lat,lon], exemple}
+let puttStimpV=(()=>{try{return +localStorage.getItem('golf-putt-stimp')||9;}catch(e){return 9;}})();
+const PUTT_G=9.81*5/7, PUTT_V0=1.83, PUTT_PASSA=0.40, PUTT_DT=0.004;
+const puttCache={};
+
+function superficieForat(n){
+  const s=typeof GREEN_SURFACE!=='undefined'&&curCourse&&GREEN_SURFACE[curCourse.name]&&GREEN_SURFACE[curCourse.name][n];
+  if(!s) return null;
+  const clau=curCourse.name+'|'+n;
+  if(!puttCache[clau]){
+    const dec=b=>{const bin=atob(b),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Int16Array(u.buffer);};
+    const z=dec(s.z),gx=dec(s.gx),gy=dec(s.gy),N=s.n*s.n;
+    const S={...s,z:new Float32Array(N),gx:new Float32Array(N),gy:new Float32Array(N)};
+    for(let i=0;i<N;i++){S.z[i]=z[i]/1000;S.gx[i]=gx[i]/1e5;S.gy[i]=gy[i]/1e5;}
+    S.e1=s.e0+(s.n-1)*s.pas; S.n1=s.n0+(s.n-1)*s.pas;
+    puttCache[clau]=S;
+  }
+  return puttCache[clau];
+}
+const puttEN=(S,ll)=>[(ll[1]-S.o[1])*S.k[0],(ll[0]-S.o[0])*S.k[1]];
+const puttLL=(S,p)=>[S.o[0]+p[1]/S.k[1],S.o[1]+p[0]/S.k[0]];
+function puttBilin(S,a,x,y){
+  const fx=(x-S.e0)/S.pas,fy=(y-S.n0)/S.pas,n=S.n;
+  const i=Math.max(0,Math.min(n-2,Math.floor(fx))),j=Math.max(0,Math.min(n-2,Math.floor(fy)));
+  const u=Math.min(1,Math.max(0,fx-i)),v=Math.min(1,Math.max(0,fy-j));
+  return (a[j*n+i]*(1-u)+a[j*n+i+1]*u)*(1-v)+(a[(j+1)*n+i]*(1-u)+a[(j+1)*n+i+1]*u)*v;
+}
+const puttDins=(S,x,y)=>x>S.e0+1&&x<S.e1-1&&y>S.n0+1&&y<S.n1-1;
+function puttAlGreen(pol,x,y){
+  let c=false;
+  for(let i=0,j=pol.length-1;i<pol.length;j=i++){
+    const [xi,yi]=pol[i],[xj,yj]=pol[j];
+    if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi) c=!c;
+  }
+  return c;
+}
+function puttRoda(S,b,ang,v0,af,guarda){
+  let x=b[0],y=b[1],vx=v0*Math.cos(ang),vy=v0*Math.sin(ang),llarg=0,t=0;
+  const pts=[[x,y,0,vx,vy]],cami=guarda?[[x,y]]:null;
+  while(t<40){
+    const ax=-PUTT_G*puttBilin(S,S.gx,x,y),ay=-PUTT_G*puttBilin(S,S.gy,x,y),sp=Math.hypot(vx,vy);
+    if(sp<0.015&&Math.hypot(ax,ay)<af) break;
+    const fx=sp>1e-6?-af*vx/sp:0,fy=sp>1e-6?-af*vy/sp:0;
+    const nvx=vx+(ax+fx)*PUTT_DT,nvy=vy+(ay+fy)*PUTT_DT;
+    if(sp<0.3&&nvx*vx+nvy*vy<0&&Math.hypot(ax,ay)<af) break;
+    vx=nvx;vy=nvy;
+    const dx=vx*PUTT_DT,dy=vy*PUTT_DT;
+    x+=dx;y+=dy;llarg+=Math.hypot(dx,dy);t+=PUTT_DT;
+    pts.push([x,y,llarg,vx,vy]);
+    if(guarda&&pts.length%5===0) cami.push([x,y]);
+    if(!puttDins(S,x,y)) break;
+  }
+  if(guarda) cami.push([x,y]);
+  return {pts,llarg,cami};
+}
+function puttMesura(r,h){
+  let best=Infinity,k=0;
+  for(let i=0;i<r.pts.length;i++){const d=Math.hypot(r.pts[i][0]-h[0],r.pts[i][1]-h[1]);if(d<best){best=d;k=i;}}
+  const p=r.pts[k];let vx=p[3],vy=p[4];
+  if(Math.hypot(vx,vy)<1e-4&&k>0){vx=p[0]-r.pts[k-1][0];vy=p[1]-r.pts[k-1][1];}
+  const cr=vx*(h[1]-p[1])-vy*(h[0]-p[0]);
+  return {lat:Math.sign(cr)*best,passa:k===r.pts.length-1?-best:r.llarg-p[2],vForat:Math.hypot(p[3],p[4])};
+}
+function puttForca(S,b,h,ang,af){
+  let lo=0.05,hi=7;
+  for(let it=0;it<26;it++){const mid=(lo+hi)/2;if(puttMesura(puttRoda(S,b,ang,mid,af,false),h).passa<PUTT_PASSA)lo=mid;else hi=mid;}
+  const v=(lo+hi)/2;
+  return {v,m:puttMesura(puttRoda(S,b,ang,v,af,false),h)};
+}
+function puttResol(S,b,h,af){
+  const dir=Math.atan2(h[1]-b[1],h[0]-b[0]),prova=[];
+  for(let k=-16;k<=16;k++){const ang=dir+k*2*Math.PI/180;prova.push({ang,...puttForca(S,b,h,ang,af)});}
+  let millor=null;
+  for(let i=0;i<prova.length-1;i++){
+    const a=prova[i],c=prova[i+1];
+    if(Math.sign(a.m.lat)!==Math.sign(c.m.lat)&&Math.abs(a.m.lat)<1.5&&Math.abs(c.m.lat)<1.5){
+      const dev=Math.abs((a.ang+c.ang)/2-dir);
+      if(!millor||dev<millor.dev) millor={a,c,dev};
+    }
+  }
+  if(!millor) return null;
+  let {a,c}=millor;
+  for(let it=0;it<22;it++){
+    const ang=(a.ang+c.ang)/2,f={ang,...puttForca(S,b,h,ang,af)};
+    if(Math.sign(f.m.lat)===Math.sign(a.m.lat)) a=f; else c=f;
+  }
+  const s=Math.abs(a.m.lat)<Math.abs(c.m.lat)?a:c;
+  return {...s,cami:puttRoda(S,b,s.ang,s.v,af,true).cami};
+}
+
+function puttEstat(n){
+  const clau=curCourse.name+'|'+n;
+  if(!puttPos[clau]){
+    const cg=COURSE_GEO[curCourse.name][n].green;
+    puttPos[clau]={forat:[cg.middle.lat,cg.middle.lon],bola:[cg.front.lat,cg.front.lon],exemple:true};
+  }
+  return puttPos[clau];
+}
+function togglePutt(){
+  puttOn=!puttOn;
+  document.getElementById('btn-putt').classList.toggle('active',puttOn);
+  document.getElementById('putt-panel').style.display=puttOn?'':'none';
+  if(puttOn&&gpsClubMode) toggleClubMode();
+  document.getElementById('gps-map').classList.toggle('club-mode',puttOn||gpsClubMode);
+  // el quadre del putt fa mes petit el mapa: es redibuixa quan el navegador ja l'ha col·locat
+  requestAnimationFrame(()=>renderGPSHole(gpsHole));
+}
+function puttMode(m){
+  puttModeAct=m;
+  document.getElementById('putt-m-bola').classList.toggle('active',m==='bola');
+  document.getElementById('putt-m-forat').classList.toggle('active',m==='forat');
+}
+function puttStimp(d){
+  puttStimpV=Math.max(6,Math.min(14,puttStimpV+d));
+  try{localStorage.setItem('golf-putt-stimp',puttStimpV);}catch(e){}
+  drawPutt(gpsHole);
+}
+function onPuttClick(ll){
+  const p=puttEstat(gpsHole);
+  p[puttModeAct]=[ll.lat,ll.lng]; p.exemple=false; p.gps=null;
+  if(puttModeAct==='forat') puttMode('bola');
+  drawPutt(gpsHole);
+}
+function puttBolaAqui(){
+  if(!navigator.geolocation){document.getElementById('putt-dades').innerHTML='<span class="av">Aquest mòbil no dona la posició GPS.</span>';return;}
+  document.getElementById('putt-dades').textContent='Buscant la teva posició…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const p=puttEstat(gpsHole);
+    p.bola=[pos.coords.latitude,pos.coords.longitude]; p.exemple=false; p.gps=Math.round(pos.coords.accuracy);
+    drawPutt(gpsHole);
+  },()=>{document.getElementById('putt-dades').innerHTML='<span class="av">No s\'ha pogut obtenir la posició GPS. Toca el green on és la bola.</span>';},
+  {enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+}
+
+function drawPutt(n){
+  if(puttLayer&&gpsMap){gpsMap.removeLayer(puttLayer);puttLayer=null;}
+  const S=superficieForat(n);
+  if(!puttOn||!S||!gpsMap) return;
+  document.getElementById('putt-stimp-v').textContent=puttStimpV.toFixed(1).replace('.',',');
+  puttLayer=L.layerGroup().addTo(gpsMap);
+  const p=puttEstat(n),b=puttEN(S,p.bola),h=puttEN(S,p.forat);
+  const pol=COURSE_GEO[curCourse.name][n].green.contour.map(ll=>puttEN(S,ll));
+  const ap=document.getElementById('putt-apunta'),dd=document.getElementById('putt-dades');
+  const fM=v=>v.toFixed(1).replace('.',',')+' m',fCm=v=>Math.round(v)+' cm';
+  const d=Math.hypot(h[0]-b[0],h[1]-b[1]);
+  const pinta=sol=>{
+    L.polyline([p.bola,p.forat],{color:'#fff',weight:1.5,opacity:.8,dashArray:'5 6',interactive:false}).addTo(puttLayer);
+    if(sol){
+      const apE=[b[0]+d*Math.cos(sol.ang),b[1]+d*Math.sin(sol.ang)],apLL=puttLL(S,apE);
+      L.polyline([p.bola,apLL],{color:'#f4d35e',weight:2,opacity:.95,dashArray:'6 5',interactive:false}).addTo(puttLayer);
+      L.circleMarker(apLL,{radius:6,color:'#f4d35e',weight:2.5,fill:false,interactive:false}).addTo(puttLayer);
+      const cami=sol.cami.map(q=>puttLL(S,q));
+      L.polyline(cami,{color:'#000',weight:6,opacity:.35,interactive:false}).addTo(puttLayer);
+      L.polyline(cami,{color:'#e2472c',weight:3.5,opacity:1,interactive:false}).addTo(puttLayer);
+    }
+    L.circleMarker(p.forat,{radius:5,color:'#fff',weight:2,fillColor:'#000',fillOpacity:1,interactive:false}).addTo(puttLayer).bindTooltip('Forat');
+    L.circleMarker(p.bola,{radius:7,color:'#222',weight:1.5,fillColor:'#fff',fillOpacity:1,interactive:false}).addTo(puttLayer);
+  };
+  const dz=(puttBilin(S,S.z,...h)-puttBilin(S,S.z,...b))*100;
+  const desn=Math.abs(dz)<1?'pla':(dz>0?'puja ':'baixa ')+fCm(Math.abs(dz));
+  const nota=(p.exemple?'Posicions d\'exemple: toca on és la bola i on és el forat. ':'')+
+    (p.gps?`Bola situada pel GPS (±${p.gps} m): si pots, afina-la tocant el mapa. `:'');
+  if(!puttAlGreen(pol,...h)){pinta(null);ap.textContent='Situa el forat dins del green';dd.textContent=nota;return;}
+  if(!puttDins(S,...b)){pinta(null);ap.textContent='La bola és massa lluny del green';dd.textContent='Toca el green o el collar on és la bola. '+nota;return;}
+  if(d<0.4){pinta(null);ap.textContent='Ja gairebé és a dins';dd.textContent='';return;}
+  ap.textContent='Calculant…';
+  setTimeout(()=>{
+    if(!puttOn||gpsHole!==n) return;
+    const af=PUTT_V0**2/(2*puttStimpV*0.3048);
+    const sol=puttResol(S,b,h,af);
+    puttLayer.clearLayers(); pinta(sol);
+    gpsMap.invalidateSize({pan:false}); gpsMap.fire('moveend');   // el llenç del Leaflet no sempre es repinta sol
+    if(!sol){ap.textContent='No hi ha cap línia que entri';dd.innerHTML=`${fM(d)} · ${desn}. <span class="av">Amb aquesta velocitat la bola no s'atura a prop del forat per cap direcció.</span>`;return;}
+    const u=[(h[0]-b[0])/d,(h[1]-b[1])/d],nL=[-u[1],u[0]];
+    const apE=[b[0]+d*Math.cos(sol.ang),b[1]+d*Math.sin(sol.ang)];
+    const off=(apE[0]-h[0])*nL[0]+(apE[1]-h[1])*nL[1];
+    let dev=0;
+    sol.cami.forEach(([x,y])=>{const t=(x-b[0])*u[0]+(y-b[1])*u[1];if(t>0&&t<d)dev=Math.max(dev,Math.abs((x-b[0])*nL[0]+(y-b[1])*nL[1]));});
+    ap.innerHTML=Math.abs(off)<0.03?'Apunta <b>al centre</b> del forat':`Apunta <b>${fCm(Math.abs(off)*100)} a ${off>0?'l\'esquerra':'la dreta'}</b> del forat`;
+    const forca=Math.max(0,sol.v**2/(2*af)-PUTT_PASSA);
+    const cau=dev*100<3?'recte':`cau ${fCm(dev*100)} ${off>0?'d\'esquerra a dreta':'de dreta a esquerra'}`;
+    dd.innerHTML=`${fM(d)} · ${desn} · força d'un putt pla de ${fM(forca)} · ${cau}`+
+      (sol.m.vForat>1.3?' · <span class="av">arriba massa ràpida i pot escopir</span>':'')+
+      (nota?`<br>${nota}`:'');
+  },20);
+}
+
 function clearTrajectory(){
   gpsTrajectoryLayers.forEach(l=>gpsMap&&gpsMap.removeLayer(l));
   gpsTrajectoryLayers=[];
@@ -824,6 +1042,7 @@ function toggleShotFilter(type){
 
 // ── PAL RECOMANAT ──
 function toggleClubMode(){
+  if(!gpsClubMode&&puttOn) togglePutt();
   gpsClubMode=!gpsClubMode;
   document.getElementById('btn-club-rec').classList.toggle('active',gpsClubMode);
   document.getElementById('gps-map').classList.toggle('club-mode',gpsClubMode);
@@ -1067,6 +1286,9 @@ function renderGPSHole(n){
   document.getElementById('gps-hp').textContent=holeGeo?`Par ${par}${si}${distStr}`:'Sense dades de forat';
   const relleu=relleuForat(n);
   document.getElementById('btn-relleu').style.display=relleu?'':'none';
+  const superf=superficieForat(n);
+  document.getElementById('btn-putt').style.display=superf?'':'none';
+  document.getElementById('putt-panel').style.display=(puttOn&&superf)?'':'none';
   if(gpsRelleu&&relleu){
     const s=relleu.stats;
     document.getElementById('gps-hp').textContent+=` · Green ${s.pm}% · cau al ${s.rumb}`;
@@ -1087,18 +1309,18 @@ function renderGPSHole(n){
   if(!gpsMap){
     gpsMap=L.map('gps-map',{zoomControl:true,attributionControl:false,preferCanvas:true});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}).addTo(gpsMap);
-    gpsMap.on('click',function(e){if(gpsClubMode) onClubMapClick(e.latlng);});
+    gpsMap.on('click',function(e){if(gpsClubMode) onClubMapClick(e.latlng); else if(puttOn) onPuttClick(e.latlng);});
   } else {
     clearTrajectory();
     clearClubRec();
     const toRemove=[];
     gpsMap.eachLayer(l=>{if(!(l instanceof L.TileLayer)&&l!==gpsMyMarker)toRemove.push(l);});
     toRemove.forEach(l=>gpsMap.removeLayer(l));
-    gpsRelleuGroup=null;
+    gpsRelleuGroup=null; puttLayer=null;
   }
   gpsMap.invalidateSize();
   const cgZoom=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[curCourse.name]&&COURSE_GEO[curCourse.name][n];
-  if(gpsRelleu&&relleu&&cgZoom&&cgZoom.green&&cgZoom.green.contour) gpsMap.fitBounds(cgZoom.green.contour,{padding:[20,20],animate:false});
+  if(((gpsRelleu&&relleu)||(puttOn&&superf))&&cgZoom&&cgZoom.green&&cgZoom.green.contour) gpsMap.fitBounds(cgZoom.green.contour,{padding:[20,20],animate:false});
   else if(bounds.length) gpsMap.fitBounds(bounds,{padding:[30,30],animate:false});
 
   // ── 3. Ara afegir marcadors (mapa ja té vista establerta) ──
@@ -1112,27 +1334,30 @@ function renderGPSHole(n){
   if(cg&&cg.green){
     // Contorn del green (Golf Pad), si el camp el té digitalitzat
     if(cg.green.contour&&cg.green.contour.length>2){
-      L.polygon(cg.green.contour,{color:'#ffffff',weight:2,opacity:0.9,fillColor:'#00e676',fillOpacity:(gpsRelleu&&relleu)?0:0.3,interactive:false}).addTo(gpsMap);
+      L.polygon(cg.green.contour,{color:'#ffffff',weight:2,opacity:0.9,fillColor:'#00e676',fillOpacity:((gpsRelleu&&relleu)||(puttOn&&superf))?0:0.3,interactive:false}).addTo(gpsMap);
     }
     const gOpts={color:'white',fillColor:'#00c853',fillOpacity:1,weight:2};
     const gSmall={...gOpts,radius:6};
     const gBig={...gOpts,radius:9};
+    if(!(puttOn&&superf)){   // en mode putt taparien la bola i el forat
     L.circleMarker([cg.green.front.lat,cg.green.front.lon],gSmall)
       .addTo(gpsMap).bindTooltip('Entrada',{permanent:false}).bindPopup('<b>Green — Entrada</b>');
     L.circleMarker([cg.green.middle.lat,cg.green.middle.lon],gBig)
       .addTo(gpsMap).bindTooltip('Centre',{permanent:false}).bindPopup('<b>Green — Centre</b>');
     L.circleMarker([cg.green.back.lat,cg.green.back.lon],gSmall)
       .addTo(gpsMap).bindTooltip('Final',{permanent:false}).bindPopup('<b>Green — Final</b>');
+    }
   } else if(greenPos){
     // Fallback: un sol punt groc
     L.circleMarker([greenPos.lat,greenPos.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
   }
   drawRelleu(n);
+  drawPutt(n);
   const clubsShown=new Set();
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
-    if(!gpsHideAllShots){
+    if(!gpsHideAllShots&&!(puttOn&&superficieForat(n))){
       const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
       if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5}).addTo(gpsShotsGroup);
       shots.forEach((s,i)=>{
@@ -1159,7 +1384,7 @@ function reRenderShots(n){
   Object.entries(gpsCourseData).forEach(([id,rd])=>{
     if(!gpsSelectedRounds.has(id)) return;
     const shots=filterGpsShots((rd.shots&&rd.shots[n])||[]);
-    if(!gpsHideAllShots){
+    if(!gpsHideAllShots&&!(puttOn&&superficieForat(n))){
       const pts=shots.filter(s=>s.lat&&s.lon&&clubVisible(s.club)).map(s=>[s.lat,s.lon]);
       if(pts.length>1) L.polyline(pts,{color:'rgba(255,255,255,0.6)',weight:2.5,lineJoin:'round'}).addTo(gpsShotsGroup);
       shots.forEach((s,i)=>{
