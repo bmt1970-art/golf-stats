@@ -710,13 +710,15 @@ function drawRelleu(n){
     const fort=c.cm%20===0;
     L.polyline(c.p,{color:'#1a1a1a',weight:fort?1.4:0.7,opacity:fort?0.8:0.5,interactive:false}).addTo(gpsRelleuGroup);
   });
-  // fletxa: longitud proporcional al pendent fins al 5 % (1,6 m), cap on baixa la bola
+  // fletxa cap on baixa la bola: cap per sota del 0,3 % (la direccio ja es soroll);
+  // llargada de 0,26 m al 0,3 % a 1,9 m al 5 %
   r.arrows.forEach(([lat,lon,rumb,p])=>{
-    const len=Math.min(p,5)/5*1.6+0.3, a=rumb*Math.PI/180;
+    if(p<0.3) return;
+    const len=0.15+Math.min(p,5)/5*1.75, a=rumb*Math.PI/180;
     const kx=1/(111320*Math.cos(lat*Math.PI/180)), ky=1/111320;
     const pt=(d,ang)=>[lat+Math.cos(ang)*d*ky,lon+Math.sin(ang)*d*kx];
     const cua=pt(-len/2,a), cap=pt(len/2,a);
-    const hl=Math.max(0.35,len*0.35);
+    const hl=Math.max(0.15,len*0.35);
     const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx];
     const e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
     const col='#0d1b6f';
