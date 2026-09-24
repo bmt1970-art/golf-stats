@@ -1,0 +1,16 @@
+{
+  "id": "putt",
+  "name": "Putt",
+  "short_name": "Putt",
+  "description": "Línia i força del putt sobre el relleu LiDAR del green on ets",
+  "start_url": "./putt.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#0e2a14",
+  "theme_color": "#0e2a14",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

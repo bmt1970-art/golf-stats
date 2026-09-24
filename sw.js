@@ -1,5 +1,5 @@
-const CACHE = 'golf-stats-v61';
-const FILES = ['./data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './manifest.json'];
+const CACHE = 'golf-stats-v62';
+const FILES = ['./data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './putt_motor.js', './manifest.json', './putt.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -17,6 +17,14 @@ self.addEventListener('fetch', e => {
   if (url.pathname === '/' || url.pathname.endsWith('/index.html')) {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+  // putt.html: tambe des de xarxa, pero se'n desa copia per poder-la obrir sense cobertura al camp
+  if (url.pathname.endsWith('/putt.html')) {
+    e.respondWith(
+      fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(k => k.put('./putt.html', c)); return r; })
+        .catch(() => caches.match('./putt.html'))
     );
     return;
   }

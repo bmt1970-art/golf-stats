@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Putt">
+<meta name="theme-color" content="#0e2a14">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="putt.webmanifest">
+<title>Putt</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--fons:#0e2a14;--pan:rgba(14,30,18,.92);--txt:#f3f6f1;--sub:#aebfab;--or:#f4d35e;--vm:#e2472c}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px -apple-system,system-ui,sans-serif;overflow:hidden;overscroll-behavior:none}
+#mapa{position:fixed;inset:0;background:#1d3b22}
+.dalt{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;gap:8px;align-items:center;
+  padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,0))}
+.nom{flex:1;min-width:0;background:var(--pan);border:0;color:var(--txt);border-radius:12px;padding:9px 12px;text-align:left;font:600 15px inherit}
+.nom small{display:block;color:var(--sub);font-weight:400;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ico{background:var(--pan);border:0;color:var(--txt);border-radius:12px;width:44px;height:44px;font-size:19px}
+.ico.on{background:var(--or);color:#222}
+.baix{position:fixed;left:0;right:0;bottom:0;z-index:1000;background:var(--pan);border-radius:18px 18px 0 0;
+  padding:12px 14px calc(env(safe-area-inset-bottom) + 12px)}
+#apunta{font-size:21px;font-weight:700;line-height:1.25}
+#apunta b{color:var(--or)}
+#dades{color:var(--sub);font-size:13px;margin-top:4px;min-height:17px}
+#dades .av{color:#ffb4a6}
+.fila{display:flex;gap:8px;align-items:center;margin-top:10px}
+.seg{display:flex;background:rgba(255,255,255,.1);border-radius:10px;padding:3px}
+.seg button{border:0;background:none;color:var(--txt);padding:8px 12px;border-radius:8px;font:600 14px inherit}
+.seg button.on{background:var(--txt);color:#1a2a1c}
+.bt{border:0;background:rgba(255,255,255,.12);color:var(--txt);padding:10px 12px;border-radius:10px;font:600 14px inherit}
+.stimp{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--sub);font-size:12px}
+.stimp b{color:var(--txt);font-size:16px;min-width:30px;text-align:center}
+.stimp button{width:34px;height:34px;border-radius:9px;border:0;background:rgba(255,255,255,.12);color:var(--txt);font-size:18px}
+#avis{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 64px);z-index:1100;display:none;
+  background:var(--or);color:#222;border-radius:12px;padding:10px 12px;font-weight:600}
+#avis button{float:right;border:0;background:#222;color:#fff;border-radius:8px;padding:5px 10px;margin-left:8px}
+#tria{position:fixed;inset:0;z-index:1200;background:var(--fons);display:none;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 12px)}
+#tria h2{margin:4px 0 4px;font-size:20px}
+#tria .sub{color:var(--sub);font-size:13px;margin-bottom:10px}
+#llista{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+.camp{color:var(--sub);font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin:14px 2px 6px}
+.gr{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:rgba(255,255,255,.07);
+  color:var(--txt);border-radius:10px;padding:12px;margin-bottom:6px;font:15px inherit;text-align:left}
+.gr span{color:var(--sub);font-size:13px}
+#inici{position:fixed;inset:0;z-index:1300;background:var(--fons);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:30px;text-align:center}
+#inici .gran{font-size:54px}
+#inici p{color:var(--sub);margin:0}
+.leaflet-control-attribution{display:none}
+</style>
+</head>
+<body>
+<div id="mapa"></div>
+
+<div class="dalt">
+  <button class="nom" id="nom" onclick="obreTria()">—<small>Toca per canviar de green</small></button>
+  <button class="ico" id="b-fletxes" onclick="toggleFletxes()" title="Fletxes de caiguda">➶</button>
+  <button class="ico" onclick="bolaAqui(true)" title="La bola és on sóc">📍</button>
+</div>
+<div id="avis"></div>
+
+<div class="baix">
+  <div id="apunta">Buscant la teva posició…</div>
+  <div id="dades"></div>
+  <div class="fila">
+    <div class="seg">
+      <button id="m-forat" class="on" onclick="mode('forat')">Forat</button>
+      <button id="m-bola" onclick="mode('bola')">Bola</button>
+    </div>
+    <div class="stimp">Stimp
+      <button onclick="stimp(-0.5)">−</button><b id="stimp-v">9,0</b><button onclick="stimp(0.5)">+</button>
+    </div>
+  </div>
+</div>
+
+<div id="tria">
+  <h2>Tria el green</h2>
+  <div class="sub" id="tria-sub"></div>
+  <div id="llista"></div>
+  <button class="bt" onclick="tancaTria()" id="tria-tanca" style="margin-top:8px">Tanca</button>
+</div>
+
+<div id="inici"><div class="gran">⛳</div><b>Putt</b><p id="inici-txt">Buscant la teva posició…</p></div>
+
+<script src="course_geo.js"></script>
+<script src="green_relief.js"></script>
+<script src="green_surface.js"></script>
+<script src="putt_motor.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+const A_PROP=120;            // m: si ets a menys d'aixo d'un green, s'obre sol
+const CANVI=35;              // m: si t'allunyes aixi del green obert i un altre es mes a prop, avisa
+let mapa, capaRelleu=null, capaPutt=null, jo=null, joCercle=null;
+let actual=null, modeAct='forat', fletxes=false, posJo=null, avisat=null;
+let stimpV=(()=>{try{return +localStorage.getItem('golf-putt-stimp')||9;}catch(e){return 9;}})();
+const estat={};               // clau -> {bola, forat, gps, exemple}
+
+// ── greens disponibles: els que tenen superficie; el 9 forats en surt una sola vegada ──
+function nomGreen(camp,n){
+  if(/Pràctiques/.test(camp)) return 'Green de pràctiques';
+  return 'Forat '+n;
+}
+function nomCamp(camp){ return camp.replace(/ - Pràctiques$/,''); }
+const GREENS=[];
+(()=>{
+  const vist=new Set();
+  for(const camp of Object.keys(typeof GREEN_SURFACE!=='undefined'?GREEN_SURFACE:{})){
+    const cg=COURSE_GEO[camp]; if(!cg) continue;
+    for(const n of Object.keys(GREEN_SURFACE[camp]).map(Number).sort((a,b)=>a-b)){
+      const g=cg[n]&&cg[n].green; if(!g||!g.contour) continue;
+      const k=JSON.stringify(g.contour.slice(0,3));
+      if(vist.has(k)) continue; vist.add(k);
+      GREENS.push({camp,n,clau:camp+'|'+n,mig:[g.middle.lat,g.middle.lon],contorn:g.contour,green:g});
+    }
+  }
+})();
+
+function dist(a,b){
+  const R=6371000,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dg=r(b[1]-a[1]);
+  const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dg/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function distGreen(p,g){      // 0 si ets dins del green; si no, distancia a la vora aproximada
+  const d=dist(p,g.mig);
+  const S=puttSuperficie(g.camp,g.n);
+  if(S){const q=puttEN(S,p),pol=g.contorn.map(ll=>puttEN(S,ll)); if(puttAlGreen(pol,...q)) return 0;}
+  return d;
+}
+function mesProper(p){
+  let m=null;
+  for(const g of GREENS){const d=distGreen(p,g); if(!m||d<m.d) m={g,d};}
+  return m;
+}
+const fM=v=>v<1000?Math.round(v)+' m':(v/1000).toFixed(v<10000?1:0).replace('.',',')+' km';
+
+// ── mapa ──
+function initMapa(){
+  mapa=L.map('mapa',{zoomControl:false,attributionControl:false,preferCanvas:true,zoomSnap:0.25});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {maxNativeZoom:19,maxZoom:23}).addTo(mapa);
+  mapa.createPane('relleu').style.zIndex=350;
+  mapa.on('click',e=>{ if(!actual) return; const p=estatDe(actual); p[modeAct]=[e.latlng.lat,e.latlng.lng];
+    p.exemple=false; if(modeAct==='bola') p.gps=null; if(modeAct==='bola') mode('forat'); dibuixaPutt(); });
+}
+
+function obre(g,auto){
+  actual=g; avisat=null; amagaAvis(); tancaTria();
+  document.getElementById('nom').innerHTML=`${nomGreen(g.camp,g.n)}<small>${nomCamp(g.camp)}${auto?' · el més proper':''}</small>`;
+  const p=estatDe(g);
+  if(posJo&&!p.fixada){ const S=puttSuperficie(g.camp,g.n); if(S&&puttDins(S,...puttEN(S,posJo))){p.bola=posJo.slice();p.gps=posJo.acc;p.exemple=false;} }
+  dibuixaRelleu();
+  mapa.fitBounds(g.contorn,{paddingTopLeft:[20,80],paddingBottomRight:[20,190],animate:false});
+  dibuixaPutt();
+}
+function estatDe(g){
+  if(!estat[g.clau]) estat[g.clau]={forat:[g.green.middle.lat,g.green.middle.lon],bola:[g.green.front.lat,g.green.front.lon],exemple:true};
+  return estat[g.clau];
+}
+
+function dibuixaRelleu(){
+  if(capaRelleu){mapa.removeLayer(capaRelleu);capaRelleu=null;}
+  const g=actual, r=GREEN_RELIEF[g.camp]&&GREEN_RELIEF[g.camp][g.n];
+  capaRelleu=L.layerGroup().addTo(mapa);
+  L.polygon(g.contorn,{color:'#fff',weight:2,opacity:.9,fill:false,interactive:false}).addTo(capaRelleu);
+  if(!r) return;
+  if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:.78,interactive:false,pane:'relleu'}).addTo(capaRelleu);
+  r.lines.forEach(c=>{const fort=c.cm%20===0;
+    L.polyline(c.p,{color:'#111',weight:fort?1.4:.7,opacity:fort?.8:.5,interactive:false}).addTo(capaRelleu);});
+  if(fletxes) r.arrows.forEach(([lat,lon,rumb,pc])=>{
+    const len=Math.min(pc,5)/5*1.6+.3,a=rumb*Math.PI/180,kx=1/(111320*Math.cos(lat*Math.PI/180)),ky=1/111320;
+    const pt=(d,an)=>[lat+Math.cos(an)*d*ky,lon+Math.sin(an)*d*kx],cua=pt(-len/2,a),cap=pt(len/2,a),hl=Math.max(.35,len*.35);
+    const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx],e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
+    L.polyline([cua,cap],{color:'#0d1b6f',weight:2.2,interactive:false}).addTo(capaRelleu);
+    L.polyline([e1,cap,e2],{color:'#0d1b6f',weight:2.2,interactive:false}).addTo(capaRelleu);
+  });
+}
+function toggleFletxes(){ fletxes=!fletxes; document.getElementById('b-fletxes').classList.toggle('on',fletxes); if(actual) dibuixaRelleu(); }
+
+// ── putt ──
+function mode(m){ modeAct=m; document.getElementById('m-forat').classList.toggle('on',m==='forat'); document.getElementById('m-bola').classList.toggle('on',m==='bola'); }
+function stimp(d){ stimpV=Math.max(6,Math.min(14,stimpV+d)); try{localStorage.setItem('golf-putt-stimp',stimpV);}catch(e){} dibuixaPutt(); }
+
+let torn=0;
+function dibuixaPutt(){
+  document.getElementById('stimp-v').textContent=stimpV.toFixed(1).replace('.',',');
+  if(capaPutt){mapa.removeLayer(capaPutt);capaPutt=null;}
+  const g=actual; if(!g) return;
+  const S=puttSuperficie(g.camp,g.n); if(!S) return;
+  capaPutt=L.layerGroup().addTo(mapa);
+  const p=estatDe(g),b=puttEN(S,p.bola),h=puttEN(S,p.forat),pol=g.contorn.map(ll=>puttEN(S,ll));
+  const ap=document.getElementById('apunta'),dd=document.getElementById('dades');
+  const fm=v=>v.toFixed(1).replace('.',',')+' m',fc=v=>Math.round(v)+' cm';
+  const d=Math.hypot(h[0]-b[0],h[1]-b[1]);
+  const pinta=sol=>{
+    L.polyline([p.bola,p.forat],{color:'#fff',weight:1.5,opacity:.8,dashArray:'5 6',interactive:false}).addTo(capaPutt);
+    if(sol){
+      const apLL=puttLL(S,[b[0]+d*Math.cos(sol.ang),b[1]+d*Math.sin(sol.ang)]);
+      L.polyline([p.bola,apLL],{color:'#f4d35e',weight:2,dashArray:'6 5',interactive:false}).addTo(capaPutt);
+      L.circleMarker(apLL,{radius:7,color:'#f4d35e',weight:2.5,fill:false,interactive:false}).addTo(capaPutt);
+      const cami=sol.cami.map(q=>puttLL(S,q));
+      L.polyline(cami,{color:'#000',weight:6,opacity:.35,interactive:false}).addTo(capaPutt);
+      L.polyline(cami,{color:'#e2472c',weight:3.5,interactive:false}).addTo(capaPutt);
+    }
+    L.circleMarker(p.forat,{radius:6,color:'#fff',weight:2,fillColor:'#000',fillOpacity:1,interactive:false}).addTo(capaPutt);
+    L.circleMarker(p.bola,{radius:8,color:'#222',weight:1.5,fillColor:'#fff',fillOpacity:1,interactive:false}).addTo(capaPutt);
+  };
+  const dz=(puttBilin(S,S.z,...h)-puttBilin(S,S.z,...b))*100;
+  const desn=Math.abs(dz)<1?'pla':(dz>0?'puja ':'baixa ')+fc(Math.abs(dz));
+  const nota=p.exemple?'Toca el mapa on és el forat. La bola va on ets amb 📍, o amb «Bola» i un toc.':
+    (p.gps?`Bola pel GPS (±${p.gps} m): si cal, afina-la amb «Bola».`:'');
+  if(!puttAlGreen(pol,...h)){pinta(null);ap.textContent='Toca on és el forat';dd.textContent=nota;return;}
+  if(!puttDins(S,...b)){pinta(null);ap.textContent='La bola és massa lluny del green';dd.textContent='Toca «Bola» i marca on és. '+nota;return;}
+  if(d<0.4){pinta(null);ap.textContent='Ja gairebé és a dins';dd.textContent='';return;}
+  ap.textContent='Calculant…'; const jo_=++torn;
+  setTimeout(()=>{
+    if(jo_!==torn) return;
+    const af=PUTT_V0**2/(2*stimpV*0.3048), sol=puttResol(S,b,h,af);
+    capaPutt.clearLayers(); pinta(sol);
+    if(!sol){ap.textContent='No hi ha cap línia que entri';dd.innerHTML=`${fm(d)} · ${desn}. <span class="av">Amb aquesta velocitat la bola no s'atura a prop del forat.</span>`;return;}
+    const u=[(h[0]-b[0])/d,(h[1]-b[1])/d],nL=[-u[1],u[0]],apE=[b[0]+d*Math.cos(sol.ang),b[1]+d*Math.sin(sol.ang)];
+    const off=(apE[0]-h[0])*nL[0]+(apE[1]-h[1])*nL[1];
+    let dev=0; sol.cami.forEach(([x,y])=>{const t=(x-b[0])*u[0]+(y-b[1])*u[1];if(t>0&&t<d)dev=Math.max(dev,Math.abs((x-b[0])*nL[0]+(y-b[1])*nL[1]));});
+    ap.innerHTML=Math.abs(off)<0.03?'Apunta <b>al centre</b> del forat':`Apunta <b>${fc(Math.abs(off)*100)} a ${off>0?'l\'esquerra':'la dreta'}</b>`;
+    const forca=Math.max(0,sol.v**2/(2*af)-PUTT_PASSA);
+    const cau=dev*100<3?'recte':`cau ${fc(dev*100)} ${off>0?'cap a la dreta':'cap a l\'esquerra'}`;
+    dd.innerHTML=`${fm(d)} · ${desn} · força d'un putt pla de <b>${fm(forca)}</b> · ${cau}`+
+      (sol.m.vForat>1.3?' · <span class="av">arriba massa ràpida</span>':'')+(nota?`<br>${nota}`:'');
+  },30);
+}
+
+// ── posicio ──
+function bolaAqui(avisa){
+  if(!posJo){ if(avisa) document.getElementById('dades').textContent='Encara no tinc la teva posició.'; return; }
+  const m=mesProper(posJo);
+  if(m&&(!actual||m.g.clau!==actual.clau)&&m.d<A_PROP) obre(m.g,true);
+  if(!actual) return;
+  const S=puttSuperficie(actual.camp,actual.n);
+  if(!puttDins(S,...puttEN(S,posJo))){ if(avisa) document.getElementById('dades').innerHTML='<span class="av">Ets fora d\'aquest green.</span>'; return; }
+  const p=estatDe(actual); p.bola=posJo.slice(); p.gps=posJo.acc; p.exemple=false; p.fixada=true;
+  mapa.panTo(posJo); dibuixaPutt();
+}
+function novaPos(pos){
+  const primer=!posJo;
+  posJo=[pos.coords.latitude,pos.coords.longitude]; posJo.acc=Math.round(pos.coords.accuracy);
+  if(!jo){ jo=L.circleMarker(posJo,{radius:7,color:'#fff',weight:2.5,fillColor:'#1e88ff',fillOpacity:1,interactive:false}).addTo(mapa);
+           joCercle=L.circle(posJo,{radius:posJo.acc,color:'#1e88ff',weight:1,fillOpacity:.12,interactive:false}).addTo(mapa); }
+  else { jo.setLatLng(posJo); joCercle.setLatLng(posJo).setRadius(posJo.acc); }
+  const m=mesProper(posJo);
+  if(primer){
+    amagaInici();
+    if(m&&m.d<A_PROP){ obre(m.g,true); bolaAqui(false); }
+    else obreTria(m?`El green més proper és a ${fM(m.d)}.`:'');
+    return;
+  }
+  if(actual&&m&&m.g.clau!==actual.clau&&m.d<A_PROP&&distGreen(posJo,actual)>CANVI&&avisat!==m.g.clau){
+    avisat=m.g.clau;
+    const av=document.getElementById('avis');
+    av.innerHTML=`Ets a prop del ${nomGreen(m.g.camp,m.g.n).toLowerCase()} <button onclick="amagaAvis()">No</button><button id="av-si">Obre'l</button>`;
+    av.style.display='block';
+    document.getElementById('av-si').onclick=()=>{obre(m.g,true);bolaAqui(false);};
+  }
+}
+function amagaAvis(){ document.getElementById('avis').style.display='none'; }
+function amagaInici(){ document.getElementById('inici').style.display='none'; }
+function sensePos(msg){
+  amagaInici();
+  obreTria(msg);
+}
+
+// ── triar green ──
+function obreTria(sub){
+  const t=document.getElementById('tria'); t.style.display='flex';
+  document.getElementById('tria-sub').textContent=sub||(posJo?'Ordenats per distància.':'');
+  document.getElementById('tria-tanca').style.display=actual?'':'none';
+  const grups={};
+  GREENS.forEach(g=>{(grups[g.camp]=grups[g.camp]||[]).push(g);});
+  let camps=Object.keys(grups);
+  if(posJo) camps.sort((a,b)=>Math.min(...grups[a].map(g=>dist(posJo,g.mig)))-Math.min(...grups[b].map(g=>dist(posJo,g.mig))));
+  document.getElementById('llista').innerHTML=camps.map(c=>`<div class="camp">${c}</div>`+
+    grups[c].map(g=>`<button class="gr" onclick="triat('${g.clau.replace(/'/g,"\\'")}')">${nomGreen(g.camp,g.n)}<span>${posJo?fM(dist(posJo,g.mig)):''}</span></button>`).join('')).join('');
+}
+function tancaTria(){ document.getElementById('tria').style.display='none'; }
+function triat(clau){ tancaTria(); obre(GREENS.find(g=>g.clau===clau),false); }
+
+// ── inici ──
+initMapa();
+stimp(0);
+if(!GREENS.length){ amagaInici(); document.getElementById('apunta').textContent='No hi ha cap green amb relleu.'; }
+else if(!navigator.geolocation){ sensePos('Aquest mòbil no dona la posició.'); }
+else {
+  navigator.geolocation.watchPosition(novaPos,
+    e=>{ if(!posJo) sensePos(e.code===1?'No has donat permís per a la posició: tria el green a mà.':'No s\'ha pogut obtenir la posició: tria el green a mà.'); },
+    {enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  setTimeout(()=>{ if(!posJo&&document.getElementById('inici').style.display!=='none') document.getElementById('inici-txt').textContent='Continua buscant… Si triga, pots triar el green a mà.'; },8000);
+  document.getElementById('inici').onclick=()=>{ if(!posJo) sensePos('Encara no tinc la posició: tria el green.'); };
+}
+</script>
+</body>
+</html>
