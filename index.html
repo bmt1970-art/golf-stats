@@ -382,6 +382,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script src="course_geo.js"></script>
 <script src="green_relief.js"></script>
 <script src="green_surface.js"></script>
+<script src="flag_history.js"></script>
 <script src="putt_motor.js"></script>
 <script src="clubs.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -725,6 +726,17 @@ function drawRelleu(n){
     L.polyline([cua,cap],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
     L.polyline([e1,cap,e2],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
   });
+}
+// ── Posicions de bandera de les partides de l'usuari (FLAG_HISTORY, de Golf Pad) ──
+// es veuen amb «Pendents» o «Putt»: groc els darrers 12 mesos, blanc les anteriors
+function drawBanderes(n){
+  const fh=typeof FLAG_HISTORY!=='undefined'&&curCourse&&FLAG_HISTORY[curCourse.name]&&FLAG_HISTORY[curCourse.name][n];
+  if(!fh||!gpsMap||!(gpsRelleu||puttOn)) return;
+  const fa=new Date(); fa.setMonth(fa.getMonth()-12); const tall=fa.toISOString().slice(0,7);
+  const g=L.layerGroup().addTo(gpsMap);
+  fh.forEach(([la,lo,m])=>L.circleMarker([la,lo],{radius:4,color:'#1a1a1a',weight:1,fillColor:m>=tall?'#f4d35e':'#ffffff',
+    fillOpacity:m>=tall?.95:.7,interactive:false}).addTo(g));
+  document.getElementById('gps-hp').textContent+=` · 🚩 ${fh.length}`;
 }
 function toggleRelleu(){
   gpsRelleu=!gpsRelleu;
@@ -1297,6 +1309,7 @@ function renderGPSHole(n){
     L.circleMarker([greenPos.lat,greenPos.lon],{radius:8,color:'white',fillColor:'#f1c40f',fillOpacity:1,weight:2}).addTo(gpsMap).bindPopup('<b>Green</b>');
   }
   drawRelleu(n);
+  drawBanderes(n);
   drawPutt(n);
   const clubsShown=new Set();
   Object.entries(gpsCourseData).forEach(([id,rd])=>{

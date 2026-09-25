@@ -85,6 +85,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
 .reg button{border:0;background:rgba(255,255,255,.1);color:var(--txt);border-radius:8px;padding:5px 9px}
 .fila2{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .fila2 .bt{flex:1;min-width:30%}
+.bt.on{background:var(--or);color:#222}
 .bt.prim{background:var(--or);color:#222}
 #cal-msg{color:var(--or);font-size:13px;min-height:18px;margin-top:6px}
 </style>
@@ -109,6 +110,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
       <button id="m-forat" class="on" onclick="mode('forat')">Forat</button>
       <button id="m-bola" onclick="mode('bola')">Bola</button>
     </div>
+    <button class="bt" id="b-banderes" onclick="toggleBanderes()" title="Posicions de bandera de les teves partides" style="padding:8px 10px">🚩</button>
     <div class="stimp">Stimp
       <button onclick="stimp(-0.5)">−</button><b id="stimp-v">9,0</b><button onclick="stimp(0.5)">+</button>
     </div>
@@ -204,6 +206,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
 <script src="course_geo.js"></script>
 <script src="green_relief.js"></script>
 <script src="green_surface.js"></script>
+<script src="flag_history.js"></script>
 <script src="putt_motor.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -215,6 +218,7 @@ let mapa, capaRelleu=null, capaPutt=null, jo=null, joCercle=null;
 let actual=null, modeAct='forat', posJo=null, avisat=null;
 let fletxes=(()=>{try{return localStorage.getItem('golf-putt-fletxes')!=='0';}catch(e){return true;}})();   // de sortida, visibles
 let stimpV=(()=>{try{return +localStorage.getItem('golf-putt-stimp')||9;}catch(e){return 9;}})();
+let banderes=(()=>{try{return localStorage.getItem('golf-putt-banderes')!=='0';}catch(e){return true;}})();
 const estat={};               // clau -> {bola, forat, gps, exemple}
 let lectura=null;             // la darrera lectura calculada (per al registre de calibratge)
 
@@ -285,6 +289,14 @@ function dibuixaRelleu(){
   const g=actual, r=GREEN_RELIEF[g.camp]&&GREEN_RELIEF[g.camp][g.n];
   capaRelleu=L.layerGroup().addTo(mapa);
   L.polygon(g.contorn,{color:'#fff',weight:2,opacity:.9,fill:false,interactive:false}).addTo(capaRelleu);
+  // posicions de bandera de les partides de l'usuari (Golf Pad): groc els darrers 12 mesos, blanc les anteriors
+  const fh=typeof FLAG_HISTORY!=='undefined'&&FLAG_HISTORY[g.camp]&&FLAG_HISTORY[g.camp][g.n];
+  document.getElementById('b-banderes').style.display=fh?'':'none';
+  if(fh&&banderes){
+    const fa=new Date(); fa.setMonth(fa.getMonth()-12); const tall=fa.toISOString().slice(0,7);
+    fh.forEach(([la,lo,m])=>L.circleMarker([la,lo],{radius:4,color:'#1a1a1a',weight:1,fillColor:m>=tall?'#f4d35e':'#ffffff',
+      fillOpacity:m>=tall?.95:.7,interactive:false,pane:'markerPane'}).addTo(capaRelleu));
+  }
   if(!r) return;
   if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:.6,interactive:false,pane:'relleu'}).addTo(capaRelleu);
   r.lines.forEach(c=>{const fort=c.cm%20===0;
@@ -299,6 +311,8 @@ function dibuixaRelleu(){
     L.polyline([e1,cap,e2],{color:'#0d1b6f',weight:2.2,lineJoin:'round',interactive:false}).addTo(capaRelleu);
   });
 }
+function toggleBanderes(){ banderes=!banderes; try{localStorage.setItem('golf-putt-banderes',banderes?'1':'0');}catch(e){}
+  document.getElementById('b-banderes').classList.toggle('on',banderes); if(actual) dibuixaRelleu(); }
 function toggleFletxes(){ fletxes=!fletxes; try{localStorage.setItem('golf-putt-fletxes',fletxes?'1':'0');}catch(e){}
   document.getElementById('b-fletxes').classList.toggle('on',fletxes); if(actual) dibuixaRelleu(); }
 
@@ -534,6 +548,7 @@ async function calComparteix(){
 initMapa();
 stimp(0);
 document.getElementById('b-fletxes').classList.toggle('on',fletxes);
+document.getElementById('b-banderes').classList.toggle('on',banderes);
 if(!GREENS.length){ amagaInici(); document.getElementById('apunta').textContent='No hi ha cap green amb relleu.'; }
 else if(!navigator.geolocation){ sensePos('Aquest mòbil no dona la posició.'); }
 else {
