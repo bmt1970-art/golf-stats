@@ -297,6 +297,8 @@ function dibuixaRelleu(){
       fillOpacity:.9,interactive:false,pane:'markerPane'}).addTo(capaRelleu));
   if(!r) return;
   if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:.6,interactive:false,pane:'relleu'}).addTo(capaRelleu);
+  // avantgreen (si el camp en te): el relleu s'hi esten; contorn discontinu
+  if(r.avant) L.polygon(r.avant,{color:'#fff',weight:1.5,opacity:.8,dashArray:'5 5',fill:false,interactive:false}).addTo(capaRelleu);
   r.lines.forEach(c=>{const fort=c.cm%20===0;
     L.polyline(c.p,{color:'#111',weight:fort?1.4:.7,opacity:fort?.8:.5,interactive:false}).addTo(capaRelleu);});
   // per sota del 0,3 % no hi ha fletxa (la direccio ja es soroll); llargada de 0,26 m al 0,3 % a 1,9 m al 5 %
