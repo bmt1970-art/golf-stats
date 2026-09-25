@@ -728,14 +728,13 @@ function drawRelleu(n){
   });
 }
 // ── Posicions de bandera de les partides de l'usuari (FLAG_HISTORY, de Golf Pad) ──
-// es veuen amb «Pendents» o «Putt»: groc els darrers 12 mesos, blanc les anteriors
+// es veuen amb «Pendents» o «Putt»; als greens sense relleu (no hi ha aquests botons), sempre (sense data)
 function drawBanderes(n){
   const fh=typeof FLAG_HISTORY!=='undefined'&&curCourse&&FLAG_HISTORY[curCourse.name]&&FLAG_HISTORY[curCourse.name][n];
-  if(!fh||!gpsMap||!(gpsRelleu||puttOn)) return;
-  const fa=new Date(); fa.setMonth(fa.getMonth()-12); const tall=fa.toISOString().slice(0,7);
+  if(!fh||!gpsMap||!(gpsRelleu||puttOn||!relleuForat(n))) return;
   const g=L.layerGroup().addTo(gpsMap);
-  fh.forEach(([la,lo,m])=>L.circleMarker([la,lo],{radius:4,color:'#1a1a1a',weight:1,fillColor:m>=tall?'#f4d35e':'#ffffff',
-    fillOpacity:m>=tall?.95:.7,interactive:false}).addTo(g));
+  fh.forEach(([la,lo])=>L.circleMarker([la,lo],{radius:4,color:'#1a1a1a',weight:1,fillColor:'#f4d35e',
+    fillOpacity:.9,interactive:false}).addTo(g));
   document.getElementById('gps-hp').textContent+=` · 🚩 ${fh.length}`;
 }
 function toggleRelleu(){

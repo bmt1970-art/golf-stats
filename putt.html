@@ -289,14 +289,12 @@ function dibuixaRelleu(){
   const g=actual, r=GREEN_RELIEF[g.camp]&&GREEN_RELIEF[g.camp][g.n];
   capaRelleu=L.layerGroup().addTo(mapa);
   L.polygon(g.contorn,{color:'#fff',weight:2,opacity:.9,fill:false,interactive:false}).addTo(capaRelleu);
-  // posicions de bandera de les partides de l'usuari (Golf Pad): groc els darrers 12 mesos, blanc les anteriors
+  // posicions de bandera de les partides de l'usuari (Golf Pad), sense data
   const fh=typeof FLAG_HISTORY!=='undefined'&&FLAG_HISTORY[g.camp]&&FLAG_HISTORY[g.camp][g.n];
   document.getElementById('b-banderes').style.display=fh?'':'none';
-  if(fh&&banderes){
-    const fa=new Date(); fa.setMonth(fa.getMonth()-12); const tall=fa.toISOString().slice(0,7);
-    fh.forEach(([la,lo,m])=>L.circleMarker([la,lo],{radius:4,color:'#1a1a1a',weight:1,fillColor:m>=tall?'#f4d35e':'#ffffff',
-      fillOpacity:m>=tall?.95:.7,interactive:false,pane:'markerPane'}).addTo(capaRelleu));
-  }
+  if(fh&&banderes)
+    fh.forEach(([la,lo])=>L.circleMarker([la,lo],{radius:4,color:'#1a1a1a',weight:1,fillColor:'#f4d35e',
+      fillOpacity:.9,interactive:false,pane:'markerPane'}).addTo(capaRelleu));
   if(!r) return;
   if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:.6,interactive:false,pane:'relleu'}).addTo(capaRelleu);
   r.lines.forEach(c=>{const fort=c.cm%20===0;
