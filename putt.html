@@ -303,17 +303,20 @@ function dibuixaRelleu(){
   if(!r) return;
   if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:.6,interactive:false,pane:'relleu'}).addTo(capaRelleu);
   // avantgreen (si el camp en te): el relleu s'hi esten; contorn discontinu
-  if(r.avant) L.polygon(r.avant,{color:'#fff',weight:1.5,opacity:.8,dashArray:'5 5',fill:false,interactive:false}).addTo(capaRelleu);
-  r.lines.forEach(c=>{const fort=c.cm%20===0;
-    L.polyline(c.p,{color:'#111',weight:fort?1.4:.7,opacity:fort?.8:.5,interactive:false}).addTo(capaRelleu);});
+  // (la franja automatica no: nomes es marca el limit del green)
+  if(r.avant&&!r.franja) L.polygon(r.avant,{color:'#fff',weight:1.5,opacity:.8,dashArray:'5 5',fill:false,interactive:false}).addTo(capaRelleu);
+  // a la franja automatica (c.f, 5e element de la fletxa): nomes corbes cada 20 cm, i tot fluix
+  r.lines.forEach(c=>{const fort=c.cm%20===0; if(c.f&&!fort) return;
+    L.polyline(c.p,{color:'#111',weight:c.f?.6:fort?1.4:.7,opacity:c.f?.4:fort?.8:.5,interactive:false}).addTo(capaRelleu);});
   // per sota del 0,3 % no hi ha fletxa (la direccio ja es soroll); llargada de 0,26 m al 0,3 % a 1,9 m al 5 %
-  if(fletxes) r.arrows.forEach(([lat,lon,rumb,pc])=>{
+  if(fletxes) r.arrows.forEach(([lat,lon,rumb,pc,f])=>{
     if(pc<0.3) return;
+    const st=f?{color:'#0d1b6f',weight:1.1,opacity:.4,interactive:false}:{color:'#0d1b6f',weight:2.2,interactive:false};
     const len=.15+Math.min(pc,5)/5*1.75,a=rumb*Math.PI/180,kx=1/(111320*Math.cos(lat*Math.PI/180)),ky=1/111320;
     const pt=(d,an)=>[lat+Math.cos(an)*d*ky,lon+Math.sin(an)*d*kx],cua=pt(-len/2,a),cap=pt(len/2,a),hl=Math.max(.15,len*.35);
     const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx],e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
-    L.polyline([cua,cap],{color:'#0d1b6f',weight:2.2,interactive:false}).addTo(capaRelleu);
-    L.polyline([e1,cap,e2],{color:'#0d1b6f',weight:2.2,lineJoin:'round',interactive:false}).addTo(capaRelleu);
+    L.polyline([cua,cap],st).addTo(capaRelleu);
+    L.polyline([e1,cap,e2],{...st,lineJoin:'round'}).addTo(capaRelleu);
   });
 }
 function toggleBanderes(){ banderes=!banderes; try{localStorage.setItem('golf-putt-banderes',banderes?'1':'0');}catch(e){}

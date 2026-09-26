@@ -707,15 +707,16 @@ function drawRelleu(n){
   // capa propia per sota de l'overlayPane (400), perque no tapi corbes, fletxes ni cops
   if(!gpsMap.getPane('relleu')){gpsMap.createPane('relleu').style.zIndex=350;}
   if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:0.6,interactive:false,pane:'relleu'}).addTo(gpsRelleuGroup);
-  // avantgreen (si el camp en te): el relleu s'hi esten; contorn discontinu
-  if(r.avant) L.polygon(r.avant,{color:'#ffffff',weight:1.5,opacity:0.8,dashArray:'5 5',fill:false,interactive:false}).addTo(gpsRelleuGroup);
+  // avantgreen (si el camp en te): el relleu s'hi esten; contorn discontinu (la franja automatica no)
+  if(r.avant&&!r.franja) L.polygon(r.avant,{color:'#ffffff',weight:1.5,opacity:0.8,dashArray:'5 5',fill:false,interactive:false}).addTo(gpsRelleuGroup);
+  // a la franja automatica (c.f, 5e element de la fletxa): nomes corbes cada 20 cm, i tot fluix
   r.lines.forEach(c=>{
-    const fort=c.cm%20===0;
-    L.polyline(c.p,{color:'#1a1a1a',weight:fort?1.4:0.7,opacity:fort?0.8:0.5,interactive:false}).addTo(gpsRelleuGroup);
+    const fort=c.cm%20===0; if(c.f&&!fort) return;
+    L.polyline(c.p,{color:'#1a1a1a',weight:c.f?0.6:fort?1.4:0.7,opacity:c.f?0.4:fort?0.8:0.5,interactive:false}).addTo(gpsRelleuGroup);
   });
   // fletxa cap on baixa la bola: cap per sota del 0,3 % (la direccio ja es soroll);
   // llargada de 0,26 m al 0,3 % a 1,9 m al 5 %
-  r.arrows.forEach(([lat,lon,rumb,p])=>{
+  r.arrows.forEach(([lat,lon,rumb,p,f])=>{
     if(p<0.3) return;
     const len=0.15+Math.min(p,5)/5*1.75, a=rumb*Math.PI/180;
     const kx=1/(111320*Math.cos(lat*Math.PI/180)), ky=1/111320;
@@ -725,8 +726,9 @@ function drawRelleu(n){
     const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx];
     const e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
     const col='#0d1b6f';
-    L.polyline([cua,cap],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
-    L.polyline([e1,cap,e2],{color:col,weight:2.2,opacity:0.95,interactive:false}).addTo(gpsRelleuGroup);
+    const w=f?1.1:2.2, op=f?0.4:0.95;
+    L.polyline([cua,cap],{color:col,weight:w,opacity:op,interactive:false}).addTo(gpsRelleuGroup);
+    L.polyline([e1,cap,e2],{color:col,weight:w,opacity:op,interactive:false}).addTo(gpsRelleuGroup);
   });
 }
 // ── Posicions de bandera de les partides de l'usuari (FLAG_HISTORY, de Golf Pad) ──
