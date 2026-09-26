@@ -23,6 +23,7 @@ html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px
 .nom small{display:block;color:var(--sub);font-weight:400;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ico{background:var(--pan);border:0;color:var(--txt);border-radius:12px;width:44px;height:44px;font-size:19px}
 .ico.on{background:var(--or);color:#222}
+.q-et{color:#fff;font:600 11px/14px system-ui,sans-serif;text-align:center;text-shadow:0 0 3px #000,0 0 2px #000;pointer-events:none}
 .baix{position:fixed;left:0;right:0;bottom:0;z-index:1000;background:var(--pan);border-radius:18px 18px 0 0;
   padding:12px 14px calc(env(safe-area-inset-bottom) + 12px)}
 #apunta{font-size:21px;font-weight:700;line-height:1.25}
@@ -97,6 +98,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
   <button class="ico" onclick="surt()" title="Torna a Golf Stats" aria-label="Torna a Golf Stats">‹</button>
   <button class="nom" id="nom" onclick="obreTria()">—<small>Toca per canviar de green</small></button>
   <button class="ico" id="b-fletxes" onclick="toggleFletxes()" title="Fletxes de caiguda">➶</button>
+  <button class="ico" id="b-quadricula" onclick="toggleQuadricula()" title="Quadrícula d'1 m des de l'entrada" aria-label="Quadrícula">#</button>
   <button class="ico" onclick="obreCal()" title="Calibratge" aria-label="Calibratge">📋</button>
   <button class="ico" onclick="bolaAqui(true)" title="La bola és on sóc">📍</button>
 </div>
@@ -219,6 +221,7 @@ let actual=null, modeAct='bola', posJo=null, avisat=null;
 let fletxes=(()=>{try{return localStorage.getItem('golf-putt-fletxes')!=='0';}catch(e){return true;}})();   // de sortida, visibles
 let stimpV=(()=>{try{return +localStorage.getItem('golf-putt-stimp')||9;}catch(e){return 9;}})();
 let banderes=(()=>{try{return localStorage.getItem('golf-putt-banderes')!=='0';}catch(e){return true;}})();
+let quadricula=(()=>{try{return localStorage.getItem('golf-putt-quadricula')!=='0';}catch(e){return true;}})();
 const estat={};               // clau -> {bola, forat, gps, exemple}
 let lectura=null;             // la darrera lectura calculada (per al registre de calibratge)
 
@@ -296,6 +299,7 @@ function dibuixaRelleu(){
   if(fh&&banderes)
     fh.forEach(([la,lo])=>L.circleMarker([la,lo],{radius:4,color:'#1a1a1a',weight:1,fillColor:'#f4d35e',
       fillOpacity:.9,interactive:false,pane:'markerPane'}).addTo(capaRelleu));
+  if(quadricula) dibuixaQuadricula(g);
   if(!r) return;
   if(r.img) L.imageOverlay(r.img.d,r.img.b,{opacity:.6,interactive:false,pane:'relleu'}).addTo(capaRelleu);
   // avantgreen (si el camp en te): el relleu s'hi esten; contorn discontinu
@@ -314,6 +318,49 @@ function dibuixaRelleu(){
 }
 function toggleBanderes(){ banderes=!banderes; try{localStorage.setItem('golf-putt-banderes',banderes?'1':'0');}catch(e){}
   document.getElementById('b-banderes').classList.toggle('on',banderes); if(actual) dibuixaRelleu(); }
+// ── quadricula d'1 m ──
+// Green de joc: origen a l'entrada i eix entrada -> darrera (metres endins i a esquerra/dreta de
+// l'eix, com un llibre de greens). Green de practiques (sense entrada): centrada al mig, al nord.
+function eixosGreen(g,S){
+  const gr=g.green,o=puttEN(S,[(gr.front||gr.middle).lat,(gr.front||gr.middle).lon]);
+  let u=[0,1];
+  if(gr.front){const f=gr.back||gr.middle,q=puttEN(S,[f.lat,f.lon]),l=Math.hypot(q[0]-o[0],q[1]-o[1]);
+    if(l>0.5) u=[(q[0]-o[0])/l,(q[1]-o[1])/l];}
+  return {o,u,v:[u[1],-u[0]],entrada:!!gr.front};     // v: cap a la dreta mirant endins
+}
+function talls(pol,a,d){      // trams de la recta a + t*d dins del poligon (parell-senar)
+  const ts=[];
+  for(let i=0;i<pol.length;i++){const p=pol[i],q=pol[(i+1)%pol.length],e=[q[0]-p[0],q[1]-p[1]];
+    const den=d[0]*e[1]-d[1]*e[0]; if(Math.abs(den)<1e-12) continue;
+    const w=[p[0]-a[0],p[1]-a[1]],t=(w[0]*e[1]-w[1]*e[0])/den,s=(w[0]*d[1]-w[1]*d[0])/den;
+    if(s>=0&&s<1) ts.push(t);}
+  ts.sort((x,y)=>x-y); const out=[]; for(let i=0;i+1<ts.length;i+=2) out.push([ts[i],ts[i+1]]); return out;
+}
+function dibuixaQuadricula(g){
+  const S=puttSuperficie(g.camp,g.n); if(!S) return;
+  const {o,u,v,entrada}=eixosGreen(g,S),pol=g.contorn.map(ll=>puttEN(S,ll));
+  const pr=pol.map(p=>[(p[0]-o[0])*u[0]+(p[1]-o[1])*u[1],(p[0]-o[0])*v[0]+(p[1]-o[1])*v[1]]);
+  const lim=i=>[Math.floor(Math.min(...pr.map(p=>p[i]))),Math.ceil(Math.max(...pr.map(p=>p[i])))];
+  const [a0,a1]=lim(0),[b0,b1]=lim(1),P=(s,t)=>puttLL(S,[o[0]+s*u[0]+t*v[0],o[1]+s*u[1]+t*v[1]]);
+  const linia=(a,d,k)=>talls(pol,a,d).forEach(([t0,t1])=>L.polyline([puttLL(S,[a[0]+t0*d[0],a[1]+t0*d[1]]),
+    puttLL(S,[a[0]+t1*d[0],a[1]+t1*d[1]])],{color:'#fff',weight:k%5===0?1.3:.7,opacity:k%5===0?.75:.4,
+    interactive:false}).addTo(capaRelleu));
+  for(let k=a0;k<=a1;k++) linia([o[0]+k*u[0],o[1]+k*u[1]],v,k);          // transversals: metres endins
+  for(let k=b0;k<=b1;k++) linia([o[0]+k*v[0],o[1]+k*v[1]],u,k);          // longitudinals: esquerra/dreta
+  const etiqueta=(ll,t)=>L.marker(ll,{interactive:false,keyboard:false,icon:L.divIcon({className:'q-et',
+    html:t,iconSize:[22,14],iconAnchor:[11,7]})}).addTo(capaRelleu);
+  for(let k=Math.ceil(a0/5)*5;k<=a1;k+=5) if(k>0) etiqueta(P(k,0),entrada?k:k+'N'); else if(k<0&&!entrada) etiqueta(P(k,0),-k+'S');
+  if(entrada) L.circleMarker(P(0,0),{radius:4,color:'#fff',weight:1.5,fillColor:'#2a7de1',fillOpacity:1,
+    interactive:false}).addTo(capaRelleu);
+}
+function posQuadricula(g,S,ll){  // "6 m endins · 2 m a l'esquerra" (o respecte del centre, al de practiques)
+  const {o,u,v,entrada}=eixosGreen(g,S),q=puttEN(S,ll),d=[q[0]-o[0],q[1]-o[1]];
+  const s=d[0]*u[0]+d[1]*u[1],t=d[0]*v[0]+d[1]*v[1],m=x=>Math.abs(x).toFixed(1).replace('.',',')+' m';
+  const lat=Math.abs(t)<0.25?'a l\'eix':m(t)+(t>0?' a la dreta':' a l\'esquerra');
+  return entrada?`${m(s)} endins · ${lat}`:`${m(s)} ${s>=0?'N':'S'} · ${m(t)} ${t>=0?'E':'O'} del centre`;
+}
+function toggleQuadricula(){ quadricula=!quadricula; try{localStorage.setItem('golf-putt-quadricula',quadricula?'1':'0');}catch(e){}
+  document.getElementById('b-quadricula').classList.toggle('on',quadricula); if(actual) dibuixaRelleu(); }
 function toggleFletxes(){ fletxes=!fletxes; try{localStorage.setItem('golf-putt-fletxes',fletxes?'1':'0');}catch(e){}
   document.getElementById('b-fletxes').classList.toggle('on',fletxes); if(actual) dibuixaRelleu(); }
 
@@ -366,7 +413,8 @@ function dibuixaPutt(){
     const forca=Math.max(0,sol.v**2/(2*af)-PUTT_PASSA);
     const cau=dev*100<3?'recte':`cau ${fc(dev*100)} ${off>0?'cap a la dreta':'cap a l\'esquerra'}`;
     dd.innerHTML=`${fm(d)} · ${desn} · força d'un putt pla de <b>${fm(forca)}</b> · ${cau}`+
-      (sol.m.vForat>1.3?' · <span class="av">arriba massa ràpida</span>':'')+(nota?`<br>${nota}`:'');
+      (sol.m.vForat>1.3?' · <span class="av">arriba massa ràpida</span>':'')+
+      (quadricula?`<br>Forat: ${posQuadricula(g,S,p.forat)}`:'')+(nota?`<br>${nota}`:'');
     // signes: apunta + = a l'esquerra del forat; caiguda + = la bola cau cap a la dreta (mirant des de la bola)
     lectura={camp:g.camp,n:g.n,green:nomGreen(g.camp,g.n),stimp:stimpV,bola:p.bola.slice(),forat:p.forat.slice(),
       dist:+d.toFixed(2),desn:Math.round(dz),apunta:Math.round(off*100),forca:+forca.toFixed(2),
@@ -550,6 +598,7 @@ initMapa();
 stimp(0);
 document.getElementById('b-fletxes').classList.toggle('on',fletxes);
 document.getElementById('b-banderes').classList.toggle('on',banderes);
+document.getElementById('b-quadricula').classList.toggle('on',quadricula);
 if(!GREENS.length){ amagaInici(); document.getElementById('apunta').textContent='No hi ha cap green amb relleu.'; }
 else if(!navigator.geolocation){ sensePos('Aquest mòbil no dona la posició.'); }
 else {
