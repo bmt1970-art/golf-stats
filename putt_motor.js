@@ -3,7 +3,9 @@
 // La bola rodola: gravetat del pendent x 5/7 i fregament constant que surt de l'Stimpmeter
 // (la bola en surt a 1,83 m/s i roda stimp x 0,3048 m en pla). Es busca la direccio i la forca
 // perque passi pel centre del forat i, si no hi entres, s'aturés PUTT_PASSA m mes enlla.
-const PUTT_G=9.81*5/7, PUTT_V0=1.83, PUTT_PASSA=0.40, PUTT_DT=0.004;
+// Fora del contorn del green (collar, avantgreen) la gespa es mes alta: hi roda com si l'Stimp fos
+// PUTT_AV vegades el del green (estimat, sense calibrar). La transicio es de mig metre (malla de 0,5 m).
+const PUTT_G=9.81*5/7, PUTT_V0=1.83, PUTT_PASSA=0.40, PUTT_DT=0.004, PUTT_AV=0.6;
 
 // Bola d'exemple en obrir un green: a l'entrada, si en te. Els greens de practiques no en tenen
 // (no hi ha sortida ni direccio d'arribada): a mig cami del centre al punt mes al sud del contorn.
@@ -29,11 +31,19 @@ function puttAlGreen(pol,x,y){
   }
   return c;
 }
-function puttRoda(S,b,ang,v0,af,guarda){
+function puttRoda(S,b,ang,v0,af0,guarda){
   let x=b[0],y=b[1],vx=v0*Math.cos(ang),vy=v0*Math.sin(ang),llarg=0,t=0;
-  const pts=[[x,y,0,vx,vy]],cami=guarda?[[x,y]]:null;
+  const pts=[[x,y,0,vx,vy]],cami=guarda?[[x,y]]:null,n=S.n,gx=S.gx,gy=S.gy,mg=S.mg,kav=1/PUTT_AV-1;
   while(t<40){
-    const ax=-PUTT_G*puttBilin(S,S.gx,x,y),ay=-PUTT_G*puttBilin(S,S.gy,x,y),sp=Math.hypot(vx,vy);
+    // interpolacio bilineal (com puttBilin) dels pendents i, si n'hi ha, de la mascara del green:
+    // fregament af0 a dins, af0 / PUTT_AV fora, i entremig la fraccio de green
+    const qx=(x-S.e0)/S.pas,qy=(y-S.n0)/S.pas;
+    const i=Math.max(0,Math.min(n-2,Math.floor(qx))),j=Math.max(0,Math.min(n-2,Math.floor(qy)));
+    const u=Math.min(1,Math.max(0,qx-i)),v=Math.min(1,Math.max(0,qy-j));
+    const k=j*n+i,w00=(1-u)*(1-v),w01=u*(1-v),w10=(1-u)*v,w11=u*v;
+    const bl=a=>a[k]*w00+a[k+1]*w01+a[k+n]*w10+a[k+n+1]*w11;
+    const af=mg?af0*(1+kav*(1-bl(mg))):af0;
+    const ax=-PUTT_G*bl(gx),ay=-PUTT_G*bl(gy),sp=Math.hypot(vx,vy);
     if(sp<0.015&&Math.hypot(ax,ay)<af) break;
     const fx=sp>1e-6?-af*vx/sp:0,fy=sp>1e-6?-af*vy/sp:0;
     const nvx=vx+(ax+fx)*PUTT_DT,nvy=vy+(ay+fy)*PUTT_DT;
@@ -95,6 +105,13 @@ function puttSuperficie(camp,n){
     const S={...s,z:new Float32Array(N),gx:new Float32Array(N),gy:new Float32Array(N)};
     for(let i=0;i<N;i++){S.z[i]=z[i]/1000;S.gx[i]=gx[i]/1e5;S.gy[i]=gy[i]/1e5;}
     S.e1=s.e0+(s.n-1)*s.pas; S.n1=s.n0+(s.n-1)*s.pas;
+    // mascara del green als nodes de la malla (1 a dins del contorn, 0 fora), per al fregament
+    const cg=typeof COURSE_GEO!=='undefined'&&COURSE_GEO[camp]&&COURSE_GEO[camp][n];
+    const c=cg&&cg.green&&cg.green.contour;
+    if(c&&c.length>2){
+      const pol=c.map(ll=>puttEN(S,ll));S.mg=new Float32Array(N);
+      for(let j=0;j<s.n;j++)for(let i=0;i<s.n;i++)S.mg[j*s.n+i]=puttAlGreen(pol,s.e0+i*s.pas,s.n0+j*s.pas)?1:0;
+    }
     puttCache[clau]=S;
   }
   return puttCache[clau];
