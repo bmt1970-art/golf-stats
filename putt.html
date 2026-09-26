@@ -50,6 +50,10 @@ html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px
 .gr{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:rgba(255,255,255,.07);
   color:var(--txt);border-radius:10px;padding:12px;margin-bottom:6px;font:15px inherit;text-align:left}
 .gr span{color:var(--sub);font-size:13px}
+.forats{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:4px 0 12px}
+.forats button{border:0;background:rgba(255,255,255,.07);color:var(--txt);border-radius:10px;padding:14px 0;font:600 17px inherit}
+.forats button.aprop,.gr.aprop{background:var(--or);color:#222}
+.gr.torna{justify-content:flex-start;gap:8px;background:transparent;padding:8px 2px;color:var(--or)}
 #inici{position:fixed;inset:0;z-index:1300;background:var(--fons);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:30px;text-align:center}
 #inici .gran{font-size:54px}
 #inici p{color:var(--sub);margin:0}
@@ -96,7 +100,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
 
 <div class="dalt">
   <button class="ico" onclick="surt()" title="Torna a Golf Stats" aria-label="Torna a Golf Stats">‹</button>
-  <button class="nom" id="nom" onclick="obreTria()">—<small>Toca per canviar de green</small></button>
+  <button class="nom" id="nom" onclick="obreTria('',actual&&grupDe(actual.camp))">—<small>Toca per canviar de green</small></button>
   <button class="ico" id="b-fletxes" onclick="toggleFletxes()" title="Fletxes de caiguda">➶</button>
   <button class="ico" id="b-quadricula" onclick="toggleQuadricula()" title="Quadrícula d'1 m des de l'entrada" aria-label="Quadrícula">#</button>
   <button class="ico" onclick="obreCal()" title="Calibratge" aria-label="Calibratge">📋</button>
@@ -120,7 +124,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
 </div>
 
 <div id="tria">
-  <h2>Tria el green</h2>
+  <h2 id="tria-tit">Tria el camp</h2>
   <div class="sub" id="tria-sub"></div>
   <div id="llista"></div>
   <div style="display:flex;gap:8px;margin-top:8px">
@@ -443,10 +447,9 @@ function novaPos(pos){
            joCercle=L.circle(posJo,{radius:posJo.acc,color:'#1e88ff',weight:1,fillOpacity:.12,interactive:false}).addTo(mapa); }
   else { jo.setLatLng(posJo); joCercle.setLatLng(posJo).setRadius(posJo.acc); }
   const m=mesProper(posJo);
-  if(primer){
+  if(primer){              // sempre la llista de camps (ordenada per distancia), encara que siguis al green
     amagaInici();
-    if(m&&m.d<A_PROP){ obre(m.g,true); bolaAqui(false); }
-    else obreTria(m?`El green més proper és a ${fM(m.d)}.`:'');
+    if(!actual) obreTria(m&&m.d<A_PROP?`Ets al ${grupDe(m.g.camp)}.`:m?`El green més proper és a ${fM(m.d)}.`:'');
     return;
   }
   if(actual&&m&&m.g.clau!==actual.clau&&m.d<A_PROP&&distGreen(posJo,actual)>CANVI&&avisat!==m.g.clau){
@@ -465,16 +468,42 @@ function sensePos(msg){
 }
 
 // ── triar green ──
-function obreTria(sub){
+// Dos nivells: la llista de camps i, dins de cada camp, els forats (graella) i els greens de
+// practiques, que a les dades son camps a part ("Golf d'Aro - Pràctiques", "Panoramica-Practiques")
+// i aqui van amb el camp el nom del qual comenca igual.
+const esPr=c=>/pr[aà]ctiques/i.test(c);
+function grupDe(camp){
+  if(!esPr(camp)) return camp;
+  const b=nomCamp(camp);
+  return [...new Set(GREENS.map(g=>g.camp))].find(x=>!esPr(x)&&x.startsWith(b))||b;
+}
+const esc=s=>s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+function obreTria(sub,grup){
   const t=document.getElementById('tria'); t.style.display='flex';
-  document.getElementById('tria-sub').textContent=sub||(posJo?'Ordenats per distància.':'');
   document.getElementById('tria-tanca').style.display=actual?'':'none';
   const grups={};
-  GREENS.forEach(g=>{(grups[g.camp]=grups[g.camp]||[]).push(g);});
-  let camps=Object.keys(grups);
-  if(posJo) camps.sort((a,b)=>Math.min(...grups[a].map(g=>dist(posJo,g.mig)))-Math.min(...grups[b].map(g=>dist(posJo,g.mig))));
-  document.getElementById('llista').innerHTML=camps.map(c=>`<div class="camp">${c}</div>`+
-    grups[c].map(g=>`<button class="gr" onclick="triat('${g.clau.replace(/'/g,"\\'")}')">${nomGreen(g.camp,g.n)}<span>${posJo?fM(dist(posJo,g.mig)):''}</span></button>`).join('')).join('');
+  GREENS.forEach(g=>{(grups[grupDe(g.camp)]=grups[grupDe(g.camp)]||[]).push(g);});
+  const dmin=c=>Math.min(...grups[c].map(g=>dist(posJo,g.mig)));
+  const prop=posJo&&mesProper(posJo), clauProp=prop&&prop.d<A_PROP?prop.g.clau:null;
+  const ll=document.getElementById('llista');
+  if(!grup||!grups[grup]){
+    document.getElementById('tria-tit').textContent='Tria el camp';
+    document.getElementById('tria-sub').textContent=sub||(posJo?'Ordenats per distància.':'');
+    const camps=Object.keys(grups);
+    if(posJo) camps.sort((a,b)=>dmin(a)-dmin(b));
+    ll.innerHTML=camps.map(c=>{
+      const nf=grups[c].filter(g=>!esPr(g.camp)).length,np=grups[c].length-nf;
+      const info=[nf?nf+' forats':'',np?(np>1?np+' greens de pràctiques':'pràctiques'):''].filter(Boolean).join(' · ');
+      return `<button class="gr${clauProp&&grups[c].some(g=>g.clau===clauProp)?' aprop':''}" onclick="obreTria('','${esc(c)}')">${c}<span>${info}${posJo?' · '+fM(dmin(c)):''}</span></button>`;
+    }).join('');
+    return;
+  }
+  document.getElementById('tria-tit').textContent=grup;
+  document.getElementById('tria-sub').textContent=sub||'Tria el forat.';
+  const forats=grups[grup].filter(g=>!esPr(g.camp)).sort((a,b)=>a.n-b.n), pr=grups[grup].filter(g=>esPr(g.camp));
+  ll.innerHTML=`<button class="gr torna" onclick="obreTria()">‹ Camps</button>`+
+    (forats.length?`<div class="forats">`+forats.map(g=>`<button class="${g.clau===clauProp?'aprop':''}" onclick="triat('${esc(g.clau)}')">${g.n}</button>`).join('')+`</div>`:'')+
+    pr.map(g=>`<button class="gr${g.clau===clauProp?' aprop':''}" onclick="triat('${esc(g.clau)}')">${nomGreen(g.camp,g.n)}<span>${posJo?fM(dist(posJo,g.mig)):''}</span></button>`).join('');
 }
 function tancaTria(){ document.getElementById('tria').style.display='none'; }
 // una pagina web no es pot tancar sola: es torna a l'app principal (a pantalla completa no hi ha barra del navegador)
