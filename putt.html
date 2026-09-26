@@ -224,7 +224,8 @@ let lectura=null;             // la darrera lectura calculada (per al registre d
 
 // ── greens disponibles: els que tenen superficie; el 9 forats en surt una sola vegada ──
 function nomGreen(camp,n){
-  if(/pr[aà]ctiques/i.test(camp)) return 'Green de pràctiques';
+  if(/pr[aà]ctiques/i.test(camp))     // si el camp en te mes d'un (Negralejo), numerats
+    return 'Green de pràctiques'+(Object.keys(COURSE_GEO[camp]||{}).length>1?' '+n:'');
   return 'Forat '+n;
 }
 function nomCamp(camp){ return camp.replace(/\s*-\s*pr[aà]ctiques$/i,''); }
