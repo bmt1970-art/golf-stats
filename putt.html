@@ -107,8 +107,8 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
   <div id="dades"></div>
   <div class="fila">
     <div class="seg">
-      <button id="m-forat" class="on" onclick="mode('forat')">Forat</button>
-      <button id="m-bola" onclick="mode('bola')">Bola</button>
+      <button id="m-bola" class="on" onclick="mode('bola')">Bola</button>
+      <button id="m-forat" onclick="mode('forat')">Forat</button>
     </div>
     <button class="bt" id="b-banderes" onclick="toggleBanderes()" title="Posicions de bandera de les teves partides" style="padding:8px 10px">🚩</button>
     <div class="stimp">Stimp
@@ -215,7 +215,7 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
 const A_PROP=120;            // m: si ets a menys d'aixo d'un green, s'obre sol
 const CANVI=35;              // m: si t'allunyes aixi del green obert i un altre es mes a prop, avisa
 let mapa, capaRelleu=null, capaPutt=null, jo=null, joCercle=null;
-let actual=null, modeAct='forat', posJo=null, avisat=null;
+let actual=null, modeAct='bola', posJo=null, avisat=null;
 let fletxes=(()=>{try{return localStorage.getItem('golf-putt-fletxes')!=='0';}catch(e){return true;}})();   // de sortida, visibles
 let stimpV=(()=>{try{return +localStorage.getItem('golf-putt-stimp')||9;}catch(e){return 9;}})();
 let banderes=(()=>{try{return localStorage.getItem('golf-putt-banderes')!=='0';}catch(e){return true;}})();
@@ -267,7 +267,8 @@ function initMapa(){
     {maxNativeZoom:19,maxZoom:23}).addTo(mapa);
   mapa.createPane('relleu').style.zIndex=350;
   mapa.on('click',e=>{ if(!actual) return; const p=estatDe(actual); p[modeAct]=[e.latlng.lat,e.latlng.lng];
-    p.exemple=false; if(modeAct==='bola') p.gps=null; if(modeAct==='bola') mode('forat'); dibuixaPutt(); });
+    // un toc mou la bola; «Forat» serveix per a un sol toc i torna a la bola (com a index.html)
+    p.exemple=false; if(modeAct==='bola') p.gps=null; if(modeAct==='forat') mode('bola'); dibuixaPutt(); });
 }
 
 function obre(g,auto){
@@ -347,10 +348,10 @@ function dibuixaPutt(){
   };
   const dz=(puttBilin(S,S.z,...h)-puttBilin(S,S.z,...b))*100;
   const desn=Math.abs(dz)<1?'pla':(dz>0?'puja ':'baixa ')+fc(Math.abs(dz));
-  const nota=p.exemple?'Toca el mapa on és el forat. La bola va on ets amb 📍, o amb «Bola» i un toc.':
-    (p.gps?`Bola pel GPS (±${p.gps} m): si cal, afina-la amb «Bola».`:'');
-  if(!puttAlGreen(pol,...h)){pinta(null);ap.textContent='Toca on és el forat';dd.textContent=nota;return;}
-  if(!puttDins(S,...b)){pinta(null);ap.textContent='La bola és massa lluny del green';dd.textContent='Toca «Bola» i marca on és. '+nota;return;}
+  const nota=p.exemple?'Toca el mapa on és la bola (o 📍 per posar-la on ets). El forat es mou amb «Forat» i un toc.':
+    (p.gps?`Bola pel GPS (±${p.gps} m): si cal, toca el mapa per afinar-la.`:'');
+  if(!puttAlGreen(pol,...h)){pinta(null);ap.textContent='Toca «Forat» i marca on és el forat';dd.textContent=nota;return;}
+  if(!puttDins(S,...b)){pinta(null);ap.textContent='La bola és massa lluny del green';dd.textContent='Toca el mapa on és la bola. '+nota;return;}
   if(d<0.4){pinta(null);ap.textContent='Ja gairebé és a dins';dd.textContent='';return;}
   ap.textContent='Calculant…'; const jo_=++torn;
   setTimeout(()=>{
