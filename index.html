@@ -712,7 +712,7 @@ function drawRelleu(n){
   // a la franja automatica (c.f, 5e element de la fletxa): nomes corbes cada 20 cm, i tot fluix
   r.lines.forEach(c=>{
     const fort=c.cm%20===0; if(c.f&&!fort) return;
-    L.polyline(c.p,{color:'#1a1a1a',weight:c.f?0.6:fort?1.4:0.7,opacity:c.f?0.4:fort?0.8:0.5,interactive:false}).addTo(gpsRelleuGroup);
+    L.polyline(c.p,{color:'#1a1a1a',weight:c.f?0.6:fort?1.4:0.7,opacity:c.f?0.5:fort?0.8:0.5,interactive:false}).addTo(gpsRelleuGroup);
   });
   // fletxa cap on baixa la bola: cap per sota del 0,3 % (la direccio ja es soroll);
   // llargada de 0,26 m al 0,3 % a 1,9 m al 5 %
@@ -726,7 +726,7 @@ function drawRelleu(n){
     const e1=[cap[0]+Math.cos(a+2.6)*hl*ky,cap[1]+Math.sin(a+2.6)*hl*kx];
     const e2=[cap[0]+Math.cos(a-2.6)*hl*ky,cap[1]+Math.sin(a-2.6)*hl*kx];
     const col='#0d1b6f';
-    const w=f?1.1:2.2, op=f?0.4:0.95;
+    const w=f?1.1:2.2, op=f?0.5:0.95;
     L.polyline([cua,cap],{color:col,weight:w,opacity:op,interactive:false}).addTo(gpsRelleuGroup);
     L.polyline([e1,cap,e2],{color:col,weight:w,opacity:op,interactive:false}).addTo(gpsRelleuGroup);
   });
