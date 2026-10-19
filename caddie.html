@@ -86,6 +86,17 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <button class="ico" id="btn-ma" onclick="modeMa()" title="Situa't tocant el mapa">✋</button>
 </div>
 <div id="mapa"></div>
+<div id="full-band" style="display:none;position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.6);overflow-y:auto">
+  <div style="background:var(--pan);margin:calc(env(safe-area-inset-top) + 16px) 10px 20px;border-radius:14px;padding:12px">
+    <b>📋 Full de banderes d'avui</b>
+    <div class="nota" style="margin:4px 0 8px">Per forat: metres des de l'entrada del green / metres des del costat, amb L (esquerra) o R (dreta),
+      mirant el green des d'on s'hi arriba. Per exemple <b>22/5R</b>. Buit, si no hi és.</div>
+    <div id="full-band-camps" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+    <div class="fila"><button class="bt verd" onclick="desaFullBanderes()">Desa</button><button class="bt" onclick="tancaFullBanderes()">Tanca</button>
+      <button class="bt" onclick="esborraFullBanderes()">Esborra-ho</button></div>
+    <div class="nota" id="full-band-err" style="color:#ffb4a6"></div>
+  </div>
+</div>
 <iframe id="putt" title="Putt" style="display:none;position:fixed;inset:0;width:100%;height:100%;border:0;z-index:5000;background:#0e2a14"></iframe>
 <div id="llegenda" style="display:none;font-size:11px;color:var(--sub);padding:4px 10px;background:var(--pan)"></div>
 <div class="baix">
@@ -141,6 +152,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <button class="bt" id="bt-planol" onclick="desaPlanol()">📥 Desa el plànol al mòbil</button>
     <button class="bt" onclick="obrePutt()">🎯 Putt</button>
     <button class="bt" onclick="obreBanderes()">🚩 Posició de banderes d'avui</button>
+    <button class="bt" onclick="obreFullBanderes()">📋 Full de banderes (xx/yyL)</button>
     <button class="bt" onclick="comparteix()">📤 Comparteix la ronda</button>
     <button class="bt" onclick="exportaRonda()">📦 Exporta la ronda</button>
     <button class="bt" onclick="esborraCops()">Esborra els cops del cap de setmana</button>
@@ -409,15 +421,57 @@ function canviZona(z,tots){
   else banderesDia.z[cfg.forat]=z;
   desaBand();pinta();
 }
-// la bandera d'un forat: la del làser; si no, la posada a mà; si no, el centre de la zona
+// ── full de banderes: «xx/yyL» = xx m des de l'entrada del green per la línia d'arribada, i yy m des del costat
+// esquerre (L) o dret (R), mirant el green des d'on s'hi arriba ──
+const llegeixPos=t=>{const r=/^\s*(\d+(?:[.,]\d+)?)\s*[\/\-\s]\s*(\d+(?:[.,]\d+)?)\s*([LRlrED])\s*$/.exec(t||'');
+  if(!r) return null;const c=r[3].toUpperCase();return{fons:+r[1].replace(',','.'),lat:+r[2].replace(',','.'),costat:c==='L'||c==='E'?'L':'R'};};
+const textPos=x=>x?`${x.fons}/${x.lat}${x.costat}`:'';
+// talls d'una recta (punt P, direcció D en metres est/nord) amb el contorn del green: paràmetres t ordenats
+function tallsGreen(n,P,D){
+  const xy=q=>[(q[1]-P[1])*DEM.k[0],(q[0]-P[0])*DEM.k[1]],C=(GEO[n].green.contour||[]).map(xy),ts=[];
+  for(let i=0,j=C.length-1;i<C.length;j=i++){const a=C[j],b=C[i],ex=b[0]-a[0],ey=b[1]-a[1],det=D[0]*(-ey)-D[1]*(-ex);
+    if(Math.abs(det)<1e-9) continue;const t=((a[0])*(-ey)-(a[1])*(-ex))/det,u=(D[0]*a[1]-D[1]*a[0])/det;if(u>=0&&u<=1) ts.push(t);}
+  return ts.sort((x,y)=>x-y);
+}
+const mou=(P,D,t)=>[P[0]+D[1]*t/DEM.k[1],P[1]+D[0]*t/DEM.k[0]];
+function puntFull(n,x){
+  const h=GEO[n];if(!h.green.contour) return null;
+  const G=ll(h.green.middle),cl=(h.centerLine||[]).map(ll);cl[0]=G;
+  // direcció d'arribada: des del punt de la línia de joc a 60 m del green cap al centre
+  let A=cl[cl.length-1];for(let i=0;i<cl.length-1;i++){if(dist(cl[i+1],G)>=60){const a=cl[i],b=cl[i+1];let t=0;for(;t<=1;t+=0.01){if(dist([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t],G)>=60) break;}A=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];break;}}
+  const dx=(G[1]-A[1])*DEM.k[0],dy=(G[0]-A[0])*DEM.k[1],L0=Math.hypot(dx,dy),D=[dx/L0,dy/L0];   // cap al green
+  const ts=tallsGreen(n,G,D);if(ts.length<2) return null;
+  const P=mou(G,D,ts[0]+x.fons);                                                     // xx m des de l'entrada
+  const E=[-D[1],D[0]];                                                               // cap a l'esquerra
+  const tl=tallsGreen(n,P,E);if(tl.length<2) return P;
+  const tE=tl[tl.length-1],tD=tl[0];                                                  // vora esquerra i vora dreta
+  return mou(P,E,x.costat==='L'?tE-x.lat:tD+x.lat);
+}
+function obreFullBanderes(){
+  const ex=banderesDia.exacta||{};
+  document.getElementById('full-band-camps').innerHTML=Array.from({length:18},(_,i)=>`<label style="font-size:12px;color:var(--sub)">${i+1}
+    <input data-f="${i+1}" value="${textPos(ex[i+1])}" placeholder="22/5R" style="width:100%;font:600 16px inherit;padding:6px;border-radius:8px;border:0"></label>`).join('');
+  document.getElementById('full-band-err').textContent='';document.getElementById('full-band').style.display='block';
+}
+function tancaFullBanderes(){document.getElementById('full-band').style.display='none';}
+function desaFullBanderes(){
+  const ex={},mal=[];
+  document.querySelectorAll('#full-band-camps input').forEach(el=>{const v=el.value.trim();if(!v) return;const x=llegeixPos(v);if(x) ex[el.dataset.f]=x;else mal.push(el.dataset.f);});
+  if(mal.length){document.getElementById('full-band-err').textContent='No entenc el forat '+mal.join(', ')+': escriu-ho com 22/5R o 22/5L.';return;}
+  banderesDia.exacta=ex;desaBand();tancaFullBanderes();pinta(true);
+}
+function esborraFullBanderes(){banderesDia.exacta={};desaBand();obreFullBanderes();pinta();}
+
+// la bandera d'un forat: la del làser; si no, la posada a mà; si no, la del full de banderes; si no, el centre de la zona
 function banderaDe(n){
   const man=banderesDia.man[n],z=zonaDe(n),pol=z&&PC.holes[n].zones&&PC.holes[n].zones[z];
-  const ref=man?{p:man,font:'marcada al mapa'}:pol?{p:centroide(pol),font:'zona '+z,z}:null;
+  const exa=(banderesDia.exacta||{})[n],pe=exa&&puntFull(n,exa);
+  const ref=man?{p:man,font:'marcada al mapa'}:pe?{p:pe,font:textPos(exa),exacta:true}:pol?{p:centroide(pol),font:'zona '+z,z}:null;
   if(bandera[n]){
     // la distància del làser, en la direcció de la referència (o del centre del green si no n'hi ha)
     const b=bandera[n],dir=ref?ref.p:ll(GEO[n].green.middle),p=puntA(b.o,b.D,rumb(b.o,dir)),g=GEO[n].green;
     return{p,D:b.D,o:b.o,dins:!g.contour||dinsPol(p,g.contour),laser:true,
-      font:'làser'+(ref?', direcció '+(man?'de la marca':'de la zona '+z):', direcció del centre')};
+      font:'làser'+(ref?', direcció '+(man?'de la marca':ref.exacta?'de '+ref.font:'de la zona '+z):', direcció del centre')};
   }
   return ref?{...ref,dins:true}:null;
 }
@@ -427,6 +481,7 @@ function textRonda(){
   const w=ventAra();if(w) L.push(`Vent: ${w.v.toFixed(1)} m/s del ${nomVent(w.d)} (${w.font}).`);
   if(banderesDia.data===avui()){
     L.push(`Posició de bandera del dia: ${banderesDia.pos||'no la sé'}`+((banderesDia.canvis||[]).length?'; canvis: '+banderesDia.canvis.map(c=>`des del forat ${c.des}, posició ${c.pos}`).join(', '):''));
+    const fe=Object.entries(banderesDia.exacta||{});if(fe.length) L.push('Full de banderes: '+fe.map(([n,x])=>`${n}: ${textPos(x)}`).join(', '));
     const ex=Object.entries(banderesDia.z).map(([n,z])=>`forat ${n} zona ${z}`).concat(Object.keys(banderesDia.man).map(n=>`forat ${n} posada a mà`));
     if(ex.length) L.push('Excepcions: '+ex.join('; '));}
   const ls=Object.keys(bandera);if(ls.length) L.push('Lectures del làser: '+ls.map(n=>{const b=banderaDe(+n);return `forat ${n} ${m(b.D)} m${b.dins?'':' (fora del green)'}`;}).join('; '));
@@ -506,7 +561,8 @@ function pintaDeixa(){
 function treuBandera(){delete bandera[cfg.forat];if(banderesDia.man[cfg.forat]){delete banderesDia.man[cfg.forat];desaBand();}document.getElementById('laser').value='';pinta();}
 function pintaLaser(){
   const zs=banderesDia.man[cfg.forat]?null:zonaDe(cfg.forat),hz=HP().zones,pd=posicioDe(cfg.forat);
-  document.getElementById('band-txt').innerHTML=banderesDia.man[cfg.forat]?'<b>posada a mà</b>':zs?`<b>zona ${zs}</b>`+(zs!==pd?` (avui la ${pd||'?'})`:''):'sense posició: tria la zona o posa-la al mapa';
+  const exf=(banderesDia.exacta||{})[cfg.forat];
+  document.getElementById('band-txt').innerHTML=banderesDia.man[cfg.forat]?'<b>posada a mà</b>':exf?`<b>${textPos(exf)}</b> (full de banderes)`:zs?`<b>zona ${zs}</b>`+(zs!==pd?` (avui la ${pd||'?'})`:''):'sense posició: tria la zona o posa-la al mapa';
   document.getElementById('zones-xips').innerHTML=hz?[1,2,3,4,5,6].map(z=>`<button class="xip${zs===z?' on':''}" onclick="triaZona(${z})">${z}</button>`).join(''):'';
   // si el làser la troba en una altra zona, potser l'han canviada
   const bl=bandera[cfg.forat]?banderaDe(cfg.forat):null,zl=bl&&bl.dins?zonaDelPunt(cfg.forat,bl.p):null,av=document.getElementById('avis-zona');
@@ -581,7 +637,7 @@ function pinta(centra){
   // la bandera: centre de la zona del dia, la marcada al mapa o la del làser
   const bz=banderaDe(cfg.forat);
   if(bz){const a=aJugar(bz.p),D=bz.laser&&dist(o,bz.o)<=5?bz.D:a.d,jj=D*fVent(a.al)+a.dz;
-    document.getElementById('e-z').textContent=bz.laser?'Làser':bz.z?'Zona '+bz.z:'Bandera';
+    document.getElementById('e-z').textContent=bz.laser?'Làser':bz.exacta?'Bandera '+bz.font:bz.z?'Zona '+bz.z:'Bandera';
     document.getElementById('d-z').textContent=m(D);document.getElementById('j-z').textContent=Math.abs(jj-D)>=1?`juga ${m(jj)}`:'';}
   else{const a=aJugar(ll(g.middle));document.getElementById('e-z').textContent='Centre del green';
     document.getElementById('d-z').textContent=m(a.d);document.getElementById('j-z').textContent=Math.abs(a.j-a.d)>=1?`juga ${m(a.j)}`:'';}
