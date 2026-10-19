@@ -68,9 +68,11 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <button class="ico" id="ant" onclick="canviaForat(-1)">◀</button>
   <div class="forat"><b id="titol">Forat 1</b><small id="subtitol"></small></div>
   <button class="ico" id="seg" onclick="canviaForat(1)">▶</button>
+  <button class="ico" id="btn-desn" onclick="toggleDesn()" title="Desnivell respecte del centre del green">⛰️</button>
   <button class="ico" id="btn-ma" onclick="modeMa()" title="Situa't tocant el mapa">✋</button>
 </div>
 <div id="mapa"></div>
+<div id="llegenda" style="display:none;font-size:11px;color:var(--sub);padding:4px 10px;background:var(--pan)"></div>
 <div class="baix">
   <div class="estat"><span id="gps">Buscant GPS…</span><span id="desn"></span></div>
   <div class="green">
@@ -79,6 +81,11 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <div class="caixa"><div class="et">Fons</div><div class="m" id="d-b">–</div><div class="j" id="j-b"></div></div>
   </div>
   <div class="pal" id="pal"></div>
+  <div class="cop" style="margin-top:8px">🎯 Làser a bandera:
+    <input id="laser" type="number" inputmode="decimal" placeholder="m" style="width:84px">
+    <button class="bt" onclick="laser()">Calcula</button>
+    <button class="bt" onclick="treuBandera()" id="bt-treu" style="display:none">✕</button>
+    <div class="llista" id="laser-res"></div></div>
   <div class="vent" id="vent">Vent: carregant…</div>
   <div class="fila" id="vent-ma" style="display:none"></div>
 
@@ -103,6 +110,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <button class="xip" data-b="vermell" onclick="triaBarra('vermell')">Vermelles</button>
   </div>
   <div class="fila">
+    <button class="bt" id="bt-planol" onclick="desaPlanol()">📥 Desa el plànol al mòbil</button>
     <button class="bt" onclick="location.href='putt.html'">🎯 Putt</button>
     <button class="bt" onclick="esborraCops()">Esborra els cops del cap de setmana</button>
   </div>
@@ -228,7 +236,11 @@ function aJugar(p){
 
 // ── mapa ──
 const mapa=L.map('mapa',{zoomControl:false,attributionControl:false,preferCanvas:true});
+const RAJOLES={bounds:[[40.54355,0.355],[40.55607,0.37971]]};
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19}).addTo(mapa);
+// ortofoto PNOA 2024 del camp (rajoles pròpies, es poden desar al mòbil per jugar sense cobertura)
+L.tileLayer('rajoles/{z}/{x}/{y}.webp',{minZoom:15,maxNativeZoom:19,maxZoom:20,bounds:RAJOLES.bounds,errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACw='}).addTo(mapa);
+L.control.attribution({prefix:false,position:'bottomright'}).addAttribution('PNOA © IGN').addTo(mapa);
 let capa=L.layerGroup().addTo(mapa), mJo=null, mObj=null, lObj=null;
 const et=(p,t,c)=>L.marker(p,{icon:L.divIcon({className:'q-et',html:`<span style="color:${c||'#fff'}">${t}</span>`,iconSize:[60,14],iconAnchor:[30,-6]}),interactive:false});
 mapa.on('click',e=>{
@@ -252,11 +264,63 @@ function dibuixaForat(centra){
   if(centra){const pts=[...Object.values(hp.tees),...(g.contour||[ll(g.middle)])];if(jo&&dist(jo,ll(g.middle))<600) pts.push(jo);
     mapa.fitBounds(pts,{padding:[18,18],animate:false});}
 }
+let capaDesn=null, desnOn=false, bandera={}, mBand=null;
+function dibuixaDesn(){
+  if(capaDesn){mapa.removeLayer(capaDesn);capaDesn=null;}
+  const lg=document.getElementById('llegenda');
+  if(!desnOn){lg.style.display='none';return;}
+  const h=H(),hp=HP(),gc=ll(h.green.middle),z0=cota(gc);
+  const pts=[...Object.values(hp.tees),...(h.green.contour||[gc])];
+  let s=Math.min(...pts.map(p=>p[0])),n=Math.max(...pts.map(p=>p[0])),w=Math.min(...pts.map(p=>p[1])),e=Math.max(...pts.map(p=>p[1]));
+  const mg=45;s-=mg/DEM.k[1];n+=mg/DEM.k[1];w-=mg/DEM.k[0];e+=mg/DEM.k[0];
+  const pas=2,nx=Math.ceil((e-w)*DEM.k[0]/pas),ny=Math.ceil((n-s)*DEM.k[1]/pas);
+  const cv=document.createElement('canvas');cv.width=nx;cv.height=ny;const cx=cv.getContext('2d'),im=cx.createImageData(nx,ny);
+  // franges d'1 m: blau per sota del centre del green, vermell per sobre
+  const BL=[[255,255,255],[198,219,239],[158,202,225],[107,174,214],[66,146,198],[33,113,181],[8,81,156],[8,48,107]];
+  const VM=[[255,255,255],[254,224,210],[252,187,161],[252,146,114],[251,106,74],[239,59,44],[203,24,29],[153,0,13]];
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
+    const z=cota([n-(j+.5)*pas/DEM.k[1],w+(i+.5)*pas/DEM.k[0]]),k=4*(j*nx+i);
+    if(z==null){im.data[k+3]=0;continue;}
+    const d=z-z0,b=Math.min(7,Math.floor(Math.abs(d)+0.5)),c=d<0?BL[b]:VM[b];
+    im.data[k]=c[0];im.data[k+1]=c[1];im.data[k+2]=c[2];im.data[k+3]=b===0?60:150;
+  }
+  cx.putImageData(im,0,0);
+  capaDesn=L.imageOverlay(cv.toDataURL(),[[s,w],[n,e]],{opacity:.75,interactive:false}).addTo(mapa);
+  lg.innerHTML="Desnivell respecte del centre del green, en franges d'1 m: <span style='color:#6baed6'>■ per sota</span> · <span style='color:#fb6a4a'>■ per sobre</span> · més intens, més desnivell (fins a 7 m)";
+  lg.style.display='';
+}
+function toggleDesn(){desnOn=!desnOn;document.getElementById('btn-desn').classList.toggle('on',desnOn);dibuixaDesn();}
+// bandera estimada amb el làser: el punt del green a aquella distància més a prop de la recta cap al centre
+function dinsPol(p,pol){let c=false;for(let i=0,j=pol.length-1;i<pol.length;j=i++){const a=pol[i],b=pol[j];
+  if((a[0]>p[0])!==(b[0]>p[0])&&p[1]<(b[1]-a[1])*(p[0]-a[0])/(b[0]-a[0])+a[1]) c=!c;}return c;}
+function puntA(o,d,rb){return[o[0]+d*Math.cos(rb*rad)/DEM.k[1],o[1]+d*Math.sin(rb*rad)/DEM.k[0]];}
+function laser(){
+  const D=+String(document.getElementById('laser').value).replace(',','.');if(!(D>0)) return;
+  const o=origen(),g=H().green,rb=rumb(o,ll(g.middle));let p=null;
+  if(g.contour) for(let da=0;da<=40&&!p;da+=0.5) for(const sg of [1,-1]){const q=puntA(o,D,rb+sg*da);if(dinsPol(q,g.contour)){p=q;break;}}
+  bandera[cfg.forat]={p:p||puntA(o,D,rb),D,dins:!!p,o};pinta();
+}
+function treuBandera(){delete bandera[cfg.forat];document.getElementById('laser').value='';pinta();}
+function pintaLaser(){
+  const b=bandera[cfg.forat],el=document.getElementById('laser-res');document.getElementById('bt-treu').style.display=b?'':'none';
+  if(!b){el.innerHTML='';return;}
+  const o=origen(),g=H().green,zo=cota(o),zb=cota(b.p),dz=(zo!=null&&zb!=null)?zb-zo:0,w=componentsVent(ventAra(),rumb(o,b.p));
+  // si t'has mogut des de la lectura, la distància és des d'on ets ara fins a la bandera estimada
+  const moguda=dist(o,b.o)>5, D=moguda?dist(o,b.p):b.D, j=D*fVent(w.al)+dz, r=recomana(j);
+  const zc=cota(ll(g.middle)),dzc=(zb!=null&&zc!=null)?zb-zc:null;
+  el.innerHTML=`<div><span class="n">Bandera${moguda?" (des d'on ets ara)":''}</span><span class="v">${m(D)} m<small>juga ${m(j)} · ${r?nomPal(r.c):''}</small></span></div>`
+    +(b.dins&&g.front?`<div><span class="n">A l'entrada / al fons del green</span><span class="v">${m(dist(ll(g.front),b.p))} / ${g.back?m(dist(b.p,ll(g.back))):'–'} m</span></div>`:'')
+    +(dzc!=null?`<div><span class="n">Bandera respecte del centre del green</span><span class="v">${signe(dzc*100)} cm</span></div>`:'')
+    +(b.dins?'':'<div><span class="n av">No cau dins del green: comprova la lectura</span></div>');
+}
 function dibuixaJo(){
   if(mJo){mapa.removeLayer(mJo);mJo=null;}
   if(mObj){mapa.removeLayer(mObj);mObj=null;}
   if(lObj){mapa.removeLayer(lObj);lObj=null;}
   if(jo) mJo=L.circleMarker(jo,{radius:8,color:'#fff',weight:3,fillColor:'#2196f3',fillOpacity:1}).addTo(mapa);
+  if(mBand){mapa.removeLayer(mBand);mBand=null;}
+  const b=bandera[cfg.forat];
+  if(b) mBand=L.marker(b.p,{icon:L.divIcon({className:'q-et',html:'<span style="font-size:20px">⛳</span>',iconSize:[24,24],iconAnchor:[6,22]}),interactive:false}).addTo(mapa);
   if(objectiu){mObj=L.circleMarker(objectiu,{radius:7,color:'#fff',weight:2,fillColor:'#ff9800',fillOpacity:1}).addTo(mapa);
     lObj=L.polyline([origen(),objectiu,ll(H().green.middle)],{color:'#ff9800',weight:2,dashArray:'6 5'}).addTo(mapa);}
 }
@@ -298,7 +362,8 @@ function pinta(centra){
   const ob=document.getElementById('objectiu');document.getElementById('obj-tit').style.display=objectiu?'':'none';
   if(objectiu){const a=aJugar(objectiu),rr=recomana(a.j),dg=dist(objectiu,ll(g.middle));
     ob.innerHTML=`<div><span class="n">Fins al punt</span><span class="v">${m(a.d)} m<small>juga ${m(a.j)} · ${rr?nomPal(rr.c):''}</small></span></div>
-      <div><span class="n">Del punt al centre del green</span><span class="v">${m(dg)} m</span></div>`;}
+      <div><span class="n">Del punt al centre del green</span><span class="v">${m(dg)} m</span></div>`
+      +(cota(objectiu)!=null?`<div><span class="n">El green respecte del punt</span><span class="v">${signe(cota(ll(g.middle))-cota(objectiu))} m</span></div>`:'');}
   else ob.innerHTML='';
   // obstacles i referències: només els que tens per davant
   const files=[], cg=ll(g.middle), dGreen=dist(o,cg), rb=rumb(o,cg);
@@ -322,7 +387,7 @@ function pinta(centra){
   document.getElementById('obstacles').innerHTML=files.length?files.map(([d,n,a])=>
     `<div><span class="n">${n}</span><span class="v">${m(d)} m${Math.abs(a.j-a.d)>=1?`<small>juga ${m(a.j)}</small>`:''}</span></div>`).join('')
     :'<div><span class="n">Res per davant fins al green</span></div>';
-  pintaCop();pintaPals();dibuixaForat(centra);dibuixaJo();
+  pintaCop();pintaPals();pintaLaser();dibuixaForat(centra);dibuixaJo();if(centra) dibuixaDesn();
 }
 
 // ── vent a mà ──
@@ -386,6 +451,26 @@ function pintaPals(){
       <td>${i.nc?m(i.cap)+' <span class="nota">· '+i.nc+'</span>':'–'}</td><td><b>${m(i.m)}</b></td></tr>`).join('');
 }
 
+// ── plànol sense cobertura: les rajoles de l'ortofoto, a una memòria pròpia que no s'esborra en actualitzar l'app ──
+const CAU_RAJOLES='pano-rajoles-v1';
+async function estatPlanol(){
+  const bt=document.getElementById('bt-planol');
+  try{const ll_=await (await fetch('rajoles/llista.json')).json(),c=await caches.open(CAU_RAJOLES),k=await c.keys();
+    bt.textContent=k.length>=ll_.n?'✅ Plànol desat al mòbil':`📥 Desa el plànol al mòbil (${String(ll_.mb).replace(".",",")} MB)`;}catch(e){}
+}
+async function desaPlanol(){
+  const bt=document.getElementById('bt-planol');
+  try{
+    const ll_=await (await fetch('rajoles/llista.json',{cache:'no-store'})).json(),c=await caches.open(CAU_RAJOLES);
+    let fet=0,err=0;const cua=[...ll_.f];
+    async function feina(){while(cua.length){const f=cua.shift(),u='rajoles/'+f;
+      try{if(!(await c.match(u))){const r=await fetch(u);if(r.ok) await c.put(u,r);else err++;}}catch(e){err++;}
+      fet++;if(fet%20===0) bt.textContent=`Desant… ${Math.round(100*fet/ll_.n)} %`;}}
+    await Promise.all([feina(),feina(),feina(),feina()]);
+    bt.textContent=err?`Desat amb ${err} errors: torna-ho a provar`:'✅ Plànol desat al mòbil';
+  }catch(e){bt.textContent='Sense connexió: torna-ho a provar amb cobertura';}
+}
+
 // ── forat i posició ──
 function canviaForat(d){cfg.forat=Math.min(18,Math.max(1,cfg.forat+d));objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}
 function triaBarra(b){cfg.barra=b;desa(CLAU_CFG,cfg);pinta();}
@@ -405,7 +490,7 @@ if(navigator.geolocation){
   {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
 }
 const q=new URLSearchParams(location.search);if(q.get('forat')){cfg.forat=Math.min(18,Math.max(1,+q.get('forat')));}
-pinta(true);carregaPrevisio();
+pinta(true);carregaPrevisio();estatPlanol();
 // la previsió es refà cada 30 min (i al cap de 20 s si la primera no ha arribat)
 setTimeout(()=>{if(!previsio) carregaPrevisio();},20000);setInterval(carregaPrevisio,30*60e3);
 </script>

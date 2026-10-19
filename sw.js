@@ -1,4 +1,4 @@
-const CACHE = 'golf-stats-v88';
+const CACHE = 'golf-stats-v89';
 const FILES = ['./data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './manifest.json', './putt.webmanifest'];
 
 self.addEventListener('install', e => {
@@ -7,7 +7,7 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    Promise.all(keys.filter(k => k !== CACHE && !k.startsWith('pano-rajoles')).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
@@ -27,6 +27,11 @@ self.addEventListener('fetch', e => {
       fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(k => k.put('./' + pag, c)); return r; })
         .catch(() => caches.match('./' + pag))
     );
+    return;
+  }
+  // plànol del Panoramica (rajoles de l'ortofoto): primer la memoria que el caddie hi ha desat
+  if (url.pathname.includes('/rajoles/') && url.pathname.endsWith('.webp')) {
+    e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(r => r || fetch(e.request)));
     return;
   }
   // Leaflet (unpkg): primer la memoria, i se'n desa copia, perque el mapa s'obri sense cobertura
