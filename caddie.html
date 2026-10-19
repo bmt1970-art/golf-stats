@@ -310,11 +310,10 @@ function toggleDesn(){desnOn=!desnOn;document.getElementById('btn-desn').classLi
 function dinsPol(p,pol){let c=false;for(let i=0,j=pol.length-1;i<pol.length;j=i++){const a=pol[i],b=pol[j];
   if((a[0]>p[0])!==(b[0]>p[0])&&p[1]<(b[1]-a[1])*(p[0]-a[0])/(b[0]-a[0])+a[1]) c=!c;}return c;}
 function puntA(o,d,rb){return[o[0]+d*Math.cos(rb*rad)/DEM.k[1],o[1]+d*Math.sin(rb*rad)/DEM.k[0]];}
+// el làser dona la distància; la direcció és la de la bandera marcada al mapa, o la de la zona del dia, o la del centre
 function laser(){
   const D=+String(document.getElementById('laser').value).replace(',','.');if(!(D>0)) return;
-  const o=origen(),g=H().green,rb=rumb(o,ll(g.middle));let p=null;
-  if(g.contour) for(let da=0;da<=40&&!p;da+=0.5) for(const sg of [1,-1]){const q=puntA(o,D,rb+sg*da);if(dinsPol(q,g.contour)){p=q;break;}}
-  bandera[cfg.forat]={p:p||puntA(o,D,rb),D,dins:!!p,o};pinta();
+  bandera[cfg.forat]={D,o:origen()};pinta();
 }
 // banderes: a l'inici de la ronda, la posició del dia (1-6, la mateixa a tots els greens). Si a un forat no hi és:
 // una altra zona només per a aquell forat, o un canvi de posició des d'aquell forat (l'han mogut a mitja ronda),
@@ -339,7 +338,8 @@ function desaPosicio(z){banderesDia={data:avui(),pos:z,canvis:[],z:{},man:{}};de
 let posantBandera=false;
 function posaBanderaMa(){posantBandera=!posantBandera;document.getElementById('bt-posa').classList.toggle('on',posantBandera);
   document.getElementById('bt-posa').textContent=posantBandera?'Toca el green on és la bandera':'📍 Posa-la al mapa';}
-function banderaAMa(p){posantBandera=false;banderesDia.man[cfg.forat]=p;delete bandera[cfg.forat];desaBand();pinta();}
+function banderaAMa(p){posantBandera=false;banderesDia.man[cfg.forat]=p;desaBand();pinta();
+  document.getElementById('bt-posa').textContent='📍 Posa-la al mapa';document.getElementById('bt-posa').classList.remove('on');}
 // el làser la troba en una altra zona: només aquest forat, o canvi de posició des d'aquí
 function canviZona(z,tots){
   if(tots){banderesDia.canvis=(banderesDia.canvis||[]).filter(c=>c.des<cfg.forat);banderesDia.canvis.push({des:cfg.forat,pos:z});
@@ -349,10 +349,15 @@ function canviZona(z,tots){
 }
 // la bandera d'un forat: la del làser; si no, la posada a mà; si no, el centre de la zona
 function banderaDe(n){
-  if(bandera[n]) return{...bandera[n],font:'làser'};
-  if(banderesDia.man[n]) return{p:banderesDia.man[n],dins:true,font:'posada a mà'};
-  const z=zonaDe(n),pol=z&&PC.holes[n].zones&&PC.holes[n].zones[z];
-  return pol?{p:centroide(pol),dins:true,font:'zona '+z,z}:null;
+  const man=banderesDia.man[n],z=zonaDe(n),pol=z&&PC.holes[n].zones&&PC.holes[n].zones[z];
+  const ref=man?{p:man,font:'marcada al mapa'}:pol?{p:centroide(pol),font:'zona '+z,z}:null;
+  if(bandera[n]){
+    // la distància del làser, en la direcció de la referència (o del centre del green si no n'hi ha)
+    const b=bandera[n],dir=ref?ref.p:ll(GEO[n].green.middle),p=puntA(b.o,b.D,rumb(b.o,dir)),g=GEO[n].green;
+    return{p,D:b.D,o:b.o,dins:!g.contour||dinsPol(p,g.contour),laser:true,
+      font:'làser'+(ref?', direcció '+(man?'de la marca':'de la zona '+z):', direcció del centre')};
+  }
+  return ref?{...ref,dins:true}:null;
 }
 // la ronda en text, per passar-la a Claude (l'app del mòbil) i analitzar-la o actualitzar el caddie
 async function comparteix(){
@@ -362,7 +367,7 @@ async function comparteix(){
     L.push(`Posició de bandera del dia: ${banderesDia.pos||'no la sé'}`+((banderesDia.canvis||[]).length?'; canvis: '+banderesDia.canvis.map(c=>`des del forat ${c.des}, posició ${c.pos}`).join(', '):''));
     const ex=Object.entries(banderesDia.z).map(([n,z])=>`forat ${n} zona ${z}`).concat(Object.keys(banderesDia.man).map(n=>`forat ${n} posada a mà`));
     if(ex.length) L.push('Excepcions: '+ex.join('; '));}
-  const ls=Object.entries(bandera);if(ls.length) L.push('Lectures del làser: '+ls.map(([n,b])=>`forat ${n} ${m(b.D)} m${b.dins?'':' (fora del green)'}`).join('; '));
+  const ls=Object.keys(bandera);if(ls.length) L.push('Lectures del làser: '+ls.map(n=>{const b=banderaDe(+n);return `forat ${n} ${m(b.D)} m${b.dins?'':' (fora del green)'}`;}).join('; '));
   const ara=Date.now(),meus=cops.filter(k=>ara-k.t<4*86400e3);
   if(meus.length){L.push('Cops entrats (pal, metres reals, desnivell, vent al llarg, equivalent en pla i sense vent):');
     meus.forEach(k=>L.push(`- ${new Date(k.t).toLocaleDateString('ca-ES')} forat ${k.forat}: ${nomPal(k.pal)} ${k.d} m, ${signe(k.dz)} m, vent ${k.al} m/s, eq. ${k.eq} m${k.ma?' (entrat a mà)':''}`));}
@@ -377,7 +382,7 @@ function pintaLaser(){
   document.getElementById('band-txt').innerHTML=banderesDia.man[cfg.forat]?'<b>posada a mà</b>':zs?`<b>zona ${zs}</b>`+(zs!==pd?` (avui la ${pd||'?'})`:''):'sense posició: tria la zona o posa-la al mapa';
   document.getElementById('zones-xips').innerHTML=hz?[1,2,3,4,5,6].map(z=>`<button class="xip${zs===z?' on':''}" onclick="triaZona(${z})">${z}</button>`).join(''):'';
   // si el làser la troba en una altra zona, potser l'han canviada
-  const bl=bandera[cfg.forat],zl=bl&&bl.dins?zonaDelPunt(cfg.forat,bl.p):null,av=document.getElementById('avis-zona');
+  const bl=bandera[cfg.forat]?banderaDe(cfg.forat):null,zl=bl&&bl.dins?zonaDelPunt(cfg.forat,bl.p):null,av=document.getElementById('avis-zona');
   av.innerHTML=zl&&zs&&zl!==zs?`<div class="nota" style="color:#ffb4a6;font-size:13px">El làser la situa a la zona ${zl}, no a la ${zs}. L'han canviada?</div>
     <div class="fila"><button class="bt" onclick="canviZona(${zl},false)">Només aquest forat</button>
     <button class="bt" onclick="canviZona(${zl},true)">Posició ${zl} des d'aquest forat</button></div>`
