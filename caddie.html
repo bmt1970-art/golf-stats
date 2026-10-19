@@ -86,6 +86,8 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <div class="caixa"><div class="et">Fons</div><div class="m" id="d-b">–</div><div class="j" id="j-b"></div></div>
   </div>
   <div class="pal" id="pal"></div>
+  <h3>Cops d'aquest forat</h3>
+  <div id="cop"></div>
   <div class="cop" style="margin-top:8px">🚩 Bandera: <span id="band-txt"></span>
     <div class="fila" id="zones-xips"></div>
     <div class="fila"><button class="bt" id="bt-posa" onclick="posaBanderaMa()">📍 Posa-la al mapa</button></div>
@@ -104,8 +106,6 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <h3>Obstacles i referències del forat</h3>
   <div class="llista" id="obstacles"></div>
 
-  <h3>Cop</h3>
-  <div id="cop"></div>
 
   <h3>Els teus pals</h3>
   <table class="taula" id="pals"></table>
@@ -214,9 +214,9 @@ const HIST=(()=>{
 })();
 let cops=llegeix(CLAU_COPS,[]);                        // [{t, forat, pal, d, dz, al, eq}]
 function distPals(){
-  const r={};
+  const r={},tots=totsCops();
   Object.entries(HIST).forEach(([c,h])=>{
-    const meus=cops.filter(k=>k.pal===c&&!k.descartat);
+    const meus=tots.filter(k=>k.pal===c&&!k.descartat);
     const n0=Math.min(h.n,6), suma=meus.reduce((s,k)=>s+k.eq,0);
     r[c]={hist:h.m,sd:h.sd,nh:h.n,nc:meus.length,cap:meus.length?suma/meus.length:null,m:(n0*h.m+suma)/(n0+meus.length)};
   });
@@ -233,7 +233,7 @@ function recomana(dJugar){
 
 // ── estat ──
 let cfg=llegeix(CLAU_CFG,{forat:1,barra:'groc'});
-let jo=null, precisio=null, ma=false, objectiu=null, copEnCurs=null, palTriat=null;
+let jo=null, precisio=null, ma=false, objectiu=null;
 const forat=()=>String(cfg.forat);
 const H=()=>GEO[forat()], HP=()=>PC.holes[forat()];
 const origen=()=>jo||HP().tees[cfg.barra]||ll(H().tee);
@@ -258,7 +258,6 @@ mapa.on('click',e=>{
   const p=[e.latlng.lat,e.latlng.lng];
   if(posantBandera){banderaAMa(p);return;}
   if(ma){jo=p;precisio=null;pinta();return;}
-  if(copEnCurs&&copEnCurs.esperaMapa){acabaCop(p);return;}
   objectiu=objectiu&&dist(objectiu,p)<4?null:p;pinta();
 });
 function dibuixaForat(centra){
@@ -275,6 +274,11 @@ function dibuixaForat(centra){
   if(hp.p70){L.circleMarker(hp.p70,{radius:4,color:'#fff',weight:1,fillColor:'#111',fillOpacity:1,interactive:false}).addTo(capa);et(hp.p70,'70').addTo(capa);}
   (h.poi||[]).forEach(p=>['reach','carry'].forEach(k=>{if(p[k]) L.circleMarker(ll(p[k]),{radius:3,color:'#000',weight:1,
     fillColor:p.type==='WATER'?'#4aa3ff':'#f2e6c9',fillOpacity:1,interactive:false}).addTo(capa);}));
+  const fr=(rondes[avui()]||{})[cfg.forat];
+  if(fr&&fr.cops.length){const pts=fr.cops.map(k=>k.p).concat(fr.green?[fr.green]:[]);
+    L.polyline(pts,{color:'#ffd54f',weight:2,dashArray:'4 4',interactive:false}).addTo(capa);
+    fr.cops.forEach((k,i)=>{L.circleMarker(k.p,{radius:6,color:'#000',weight:1,fillColor:'#ffd54f',fillOpacity:1,interactive:false}).addTo(capa);
+      et(k.p,`${i+1} ${nomPal(k.pal)}`,'#ffd54f').addTo(capa);});}
   Object.entries(hp.tees).forEach(([b,p])=>L.circleMarker(p,{radius:5,color:'#000',weight:1,
     fillColor:{blanc:'#fff',groc:'#f2d32b',blau:'#1f5fbf',vermell:'#d62828'}[b],fillOpacity:1,interactive:false}).addTo(capa));
   if(centra){const pts=[...Object.values(hp.tees),...(g.contour||[ll(g.middle)])];if(jo&&dist(jo,ll(g.middle))<600) pts.push(jo);
@@ -368,8 +372,12 @@ async function comparteix(){
     const ex=Object.entries(banderesDia.z).map(([n,z])=>`forat ${n} zona ${z}`).concat(Object.keys(banderesDia.man).map(n=>`forat ${n} posada a mà`));
     if(ex.length) L.push('Excepcions: '+ex.join('; '));}
   const ls=Object.keys(bandera);if(ls.length) L.push('Lectures del làser: '+ls.map(n=>{const b=banderaDe(+n);return `forat ${n} ${m(b.D)} m${b.dins?'':' (fora del green)'}`;}).join('; '));
+  const ro=rondes[avui()]||{};
+  Object.keys(ro).map(Number).sort((a,b)=>a-b).forEach(n=>{const f=ro[n];if(!f.cops.length&&f.putts==null) return;
+    L.push(`Forat ${n} (par ${PC.holes[n].par}): `+copsDe(f).map(k=>`${nomPal(k.pal)}${k.d!=null?' '+m(k.d)+' m'+(Math.abs(k.dz)>=1?` (${signe(k.dz)} m)`:''):''}${k.no?' [no compta]':''}`).join(', ')
+      +(f.green?' · al green':'')+(f.pen?` · ${f.pen} pen.`:'')+(f.putts!=null?` · ${f.putts} putts → ${copsForat(n)} cops`:' · en joc'));});
   const ara=Date.now(),meus=cops.filter(k=>ara-k.t<4*86400e3);
-  if(meus.length){L.push('Cops entrats (pal, metres reals, desnivell, vent al llarg, equivalent en pla i sense vent):');
+  if(meus.length){L.push('Cops entrats a mà (pal, metres, desnivell, vent al llarg, equivalent en pla i sense vent):');
     meus.forEach(k=>L.push(`- ${new Date(k.t).toLocaleDateString('ca-ES')} forat ${k.forat}: ${nomPal(k.pal)} ${k.d} m, ${signe(k.dz)} m, vent ${k.al} m/s, eq. ${k.eq} m${k.ma?' (entrat a mà)':''}`));}
   L.push('Distàncies dels pals ara (historial · cap de setmana · combinada): '+distPals().map(([c,i])=>`${nomPal(c)} ${m(i.hist)}·${i.nc?m(i.cap)+'('+i.nc+')':'-'}·${m(i.m)}`).join(', '));
   const text=L.join('\n');
@@ -414,6 +422,7 @@ function dibuixaJo(){
 // ── pintar ──
 const m=x=>Math.round(x);
 const signe=x=>(x>0?'+':x<0?'−':'')+Math.abs(Math.round(x));
+const resPar=d=>d===0?'par':signe(d);
 function pinta(centra){
   const h=H(),hp=HP();
   document.getElementById('titol').textContent=`Forat ${cfg.forat}`;
@@ -493,43 +502,89 @@ function ventDir(d){ventMa={v:ventMa?ventMa.v:4,d};desa(CLAU_VENT,ventMa);pinta(
 function ventForca(v){ventMa={v,d:ventMa?ventMa.d:(ventAra()||{d:0}).d};desa(CLAU_VENT,ventMa);pinta();obreVentMa();obreVentMa();}
 function ventAuto(){ventMa=null;desa(CLAU_VENT,null);document.getElementById('vent-ma').style.display='none';pinta();}
 
-// ── cops ──
+// ── cops, com al Golf Pad: a cada bola, un toc al pal amb què jugues des d'allà ──
+// La posició del cop és la del GPS (o la marcada amb ✋). El cop següent, o la bola al green, en tanca la distància;
+// amb el desnivell i el vent del moment, en surt l'equivalent en pla i sense vent, que ajusta la distància del pal.
+const CLAU_RONDA='pano-caddie-rondes';
+let rondes=llegeix(CLAU_RONDA,{});                    // {data: {forat: {cops:[{pal,p,t,w,no}], green, putts, pen}}}
+const rondaAvui=()=>(rondes[avui()]=rondes[avui()]||{});
+const foratR=n=>(rondaAvui()[n]=rondaAvui()[n]||{cops:[],green:null,putts:null,pen:0});
+const desaRonda=()=>desa(CLAU_RONDA,rondes);
+const foratEnJoc=()=>{const f=(rondes[avui()]||{})[cfg.forat];return !!(f&&f.cops.length&&f.putts==null);};
+// els cops d'un forat amb la distància (fins al cop següent o fins a la bola al green)
+function copsDe(f){
+  return f.cops.map((k,i)=>{
+    const fi=i+1<f.cops.length?f.cops[i+1].p:f.green;
+    if(!fi) return{...k};
+    const d=dist(k.p,fi),zi=cota(k.p),zf=cota(fi),dz=(zi!=null&&zf!=null)?zf-zi:0,al=componentsVent(k.w,rumb(k.p,fi)).al;
+    const dd=k.dm||d;
+    return{...k,fi,d:dd,dz,al,eq:dd*fVent(al)+dz};
+  });
+}
+// un cop compta per a la distància del pal si és sencer: no marcat «no compta», i almenys el 75 % del que fa el pal
+// (un approach a mig swing no ha d'escurçar el pal); amb ✓ es força
+const parcial=k=>k.d!=null&&HIST[k.pal]&&k.eq<0.75*HIST[k.pal].m;
+const compta=k=>k.d!=null&&k.d>=15&&!k.no&&(k.si||!parcial(k));
+// tots els cops que compten per als pals: els entrats a mà i els de les rondes dels darrers 4 dies
+function totsCops(){
+  const r=cops.slice(),lim=new Date(Date.now()-4*86400e3).toISOString().slice(0,10);
+  Object.entries(rondes).forEach(([data,ro])=>{if(data<lim) return;
+    Object.entries(ro).forEach(([n,f])=>copsDe(f).forEach(k=>{if(compta(k)) r.push({t:k.t,forat:+n,pal:k.pal,d:k.d,dz:k.dz,al:k.al,eq:k.eq});}));});
+  return r;
+}
+function pega(pal){
+  if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
+  const f=foratR(cfg.forat);if(f.putts!=null){f.putts=null;}
+  if(f.green){f.green=null;}
+  f.cops.push({pal,p:jo.slice(),t:Date.now(),w:ventAra()});desaRonda();encen();pinta();
+}
+function alGreen(){if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
+  const f=foratR(cfg.forat);f.green=jo.slice();desaRonda();pinta();}
+function putts(n){const f=foratR(cfg.forat);f.putts=n;if(!f.green&&jo) f.green=jo.slice();desaRonda();pinta();}
+function penal(){const f=foratR(cfg.forat);f.pen=(f.pen||0)+1;desaRonda();pinta();}
+function desfes(){const f=foratR(cfg.forat);
+  if(f.putts!=null) f.putts=null; else if(f.green) f.green=null; else if(f.pen) f.pen--; else f.cops.pop();desaRonda();pinta();}
+// ⊘ / ✓: canvia si el cop compta per a la distància del pal
+function noCompta(i){const f=foratR(cfg.forat),k=f.cops[i],ara=compta(copsDe(f)[i]);
+  if(ara){k.no=true;k.si=false;}else{k.no=false;k.si=true;}desaRonda();pinta();}
+function metresCop(i){const f=foratR(cfg.forat),k=copsDe(f)[i];if(k.d==null) return;
+  const v=prompt(`Metres reals del cop amb ${nomPal(k.pal)} (el GPS en diu ${m(k.d)}):`,m(k.d));
+  if(v&&+v>0){f.cops[i].dm=+v;desaRonda();pinta();}}
+const copsForat=n=>{const f=(rondes[avui()]||{})[n];return f?f.cops.length+(f.putts||0)+(f.pen||0):0;};
 function pintaCop(){
-  const el=document.getElementById('cop'), ps=distPals();
-  if(copEnCurs&&copEnCurs.acabat){const k=copEnCurs;
-    el.innerHTML=`<div class="cop">${nomPal(k.pal)}: <b>${m(k.d)} m</b>${Math.abs(k.dz)>=0.5?`, ${signe(k.dz)} m de desnivell`:''}${Math.abs(k.al)>=0.5?`, vent ${k.al<0?'de cara':'a favor'} ${Math.abs(k.al).toFixed(1).replace('.',',')} m/s`:''}.
-      <br>En pla i sense vent serien <b>${m(k.eq)} m</b>.<div class="fila">Metres reals: <input id="cop-m" type="number" inputmode="numeric" value="${m(k.d)}">
-      <button class="bt verd" onclick="desaCop()">Desa</button><button class="bt" onclick="copEnCurs=null;pinta()">No el comptis</button></div></div>`;
-    return;}
-  if(copEnCurs){
-    el.innerHTML=`<div class="cop">Cop amb <b>${nomPal(copEnCurs.pal)}</b> des de ${copEnCurs.ma?'el punt marcat':'aquí'}. Quan arribis a la bola:
-      <div class="fila"><button class="bt gran verd" onclick="acabaCop()">📍 La bola és aquí</button>
-      <button class="bt${copEnCurs.esperaMapa?' on':''}" onclick="copEnCurs.esperaMapa=!copEnCurs.esperaMapa;pinta()">Toca al mapa</button>
-      <button class="bt vm" onclick="copEnCurs=null;pinta()">✕</button></div></div>`;
-    return;}
-  el.innerHTML=`<div class="fila">${ps.map(([c])=>`<button class="xip${palTriat===c?' on':''}" onclick="palTriat='${c}';pinta()">${nomPal(c)}</button>`).join('')}</div>
-    <div class="fila"><button class="bt gran verd" ${palTriat?'':'disabled'} onclick="comencaCop()">🏌️ Pego des d'aquí${palTriat?' amb '+nomPal(palTriat):''}</button></div>
-    <div class="fila"><span class="nota" style="margin:8px 4px 0 0">O escriu-ne els metres:</span><input id="cop-ma" type="number" inputmode="numeric" placeholder="m" style="width:80px;font:700 16px inherit;padding:6px;border-radius:8px;border:0">
-    <button class="bt" ${palTriat?'':'disabled'} onclick="copAMa()">Afegeix</button></div>`;
-}
-function comencaCop(){if(!palTriat) return;copEnCurs={pal:palTriat,ini:origen(),ma:!jo||ma,forat:cfg.forat,t:Date.now()};pinta();}
-function acabaCop(p){
-  const fi=p||jo;if(!fi){copEnCurs.esperaMapa=true;pinta();return;}
-  const k=copEnCurs,d=dist(k.ini,fi),zi=cota(k.ini),zf=cota(fi),dz=(zi!=null&&zf!=null)?zf-zi:0;
-  const w=componentsVent(ventAra(),rumb(k.ini,fi));
-  Object.assign(k,{fi,d,dz,al:w.al,eq:d*fVent(w.al)+dz,acabat:true,esperaMapa:false});pinta();
-}
-function desaCop(){
-  const k=copEnCurs,dm=+document.getElementById('cop-m').value;
-  if(dm>0&&Math.abs(dm-k.d)>=1){k.eq=k.eq*dm/k.d;k.d=dm;}
-  cops.push({t:k.t,forat:k.forat,pal:k.pal,d:Math.round(k.d),dz:+k.dz.toFixed(1),al:+k.al.toFixed(1),eq:Math.round(k.eq)});
-  desa(CLAU_COPS,cops);copEnCurs=null;pinta();
+  const el=document.getElementById('cop'),f=(rondes[avui()]||{})[cfg.forat]||{cops:[],green:null,putts:null,pen:0},ks=copsDe(f),ps=distPals();
+  const fila=(k,i)=>{const dm=k.dm||null,d=dm||k.d;
+    const c=compta(k);
+    return `<div><span class="n">${i+1}. <b>${nomPal(k.pal)}</b>${d!=null&&!c?(k.no?' <i>(no compta)</i>':' <i>(parcial, no compta)</i>'):''}</span><span class="v">${d!=null?m(d)+' m':'…'}`
+      +(d!=null&&Math.abs(k.eq-k.d)>=1&&!dm?`<small>en pla ${m(k.eq)}</small>`:'')+`
+      ${d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="noCompta(${i})" title="Compta o no per a la distància del pal">${c?'⊘':'✓'}</button>`:''}
+      ${d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="metresCop(${i})" title="Corregeix els metres">✎</button>`:''}</span></div>`;};
+  const fet=f.putts!=null,total=f.cops.length+(f.putts||0)+(f.pen||0),par=HP().par;
+  el.innerHTML=(ks.length?`<div class="llista">${ks.map(fila).join('')}</div>`:'<div class="nota" style="margin:0 0 4px">A cada bola, toca el pal amb què jugues des d\'allà: es desa la posició.</div>')
+    +(f.green?`<div class="nota">⛳ Bola al green${f.pen?` · ${f.pen} de penalització`:''}${fet?` · ${f.putts} putts → <b>${total} cops</b> (${resPar(total-par)})`:''}</div>`:'')
+    +(f.pen&&!f.green?`<div class="nota">${f.pen} de penalització</div>`:'')
+    +`<div class="fila">${ps.map(([c])=>`<button class="xip" onclick="pega('${c}')">${nomPal(c)}</button>`).join('')}</div>
+    <div class="fila"><button class="bt verd" onclick="alGreen()">⛳ Bola al green</button>
+      ${f.green?[0,1,2,3,4].map(n=>`<button class="xip${f.putts===n?' on':''}" onclick="putts(${n})">${n}p</button>`).join(''):''}</div>
+    <div class="fila"><button class="bt" onclick="penal()">+1 penalització</button><button class="bt" onclick="desfes()">↩ Desfés</button></div>
+    <div class="fila"><span class="nota" style="margin:8px 4px 0 0">Cop sense GPS: pal i metres</span>
+      <select id="cop-pal" style="font:600 14px inherit;padding:6px;border-radius:8px">${ps.map(([c])=>`<option value="${c}">${nomPal(c)}</option>`).join('')}</select>
+      <input id="cop-ma" type="number" inputmode="numeric" placeholder="m" style="width:70px;font:700 16px inherit;padding:6px;border-radius:8px;border:0">
+      <button class="bt" onclick="copAMa()">Afegeix</button></div>`;
+  // resultat de la ronda a la línia d'estat
+  const ro=rondes[avui()]||{},fets=Object.entries(ro).filter(([n,x])=>x.putts!=null);
+  if(fets.length){const tot=fets.reduce((s,[n])=>s+copsForat(n),0),pars=fets.reduce((s,[n])=>s+PC.holes[n].par,0);
+    document.getElementById('desn').textContent+=` · Ronda ${tot} (${resPar(tot-pars)}, ${fets.length} forats)`;}
 }
 function copAMa(){
-  const d=+document.getElementById('cop-ma').value;if(!palTriat||!(d>0)) return;
-  cops.push({t:Date.now(),forat:cfg.forat,pal:palTriat,d,dz:0,al:0,eq:d,ma:1});desa(CLAU_COPS,cops);pinta();
+  const d=+document.getElementById('cop-ma').value,pal=document.getElementById('cop-pal').value;if(!pal||!(d>0)) return;
+  cops.push({t:Date.now(),forat:cfg.forat,pal,d,dz:0,al:0,eq:d,ma:1});desa(CLAU_COPS,cops);pinta();
 }
-function esborraCops(){if(confirm('Esborro els '+cops.length+' cops entrats aquí?')){cops=[];desa(CLAU_COPS,cops);pinta();}}
+function esborraCops(){if(confirm('Esborro els cops entrats a mà i les rondes desades en aquest mòbil?')){cops=[];rondes={};desa(CLAU_COPS,cops);desaRonda();pinta();}}
+// pantalla sempre encesa mentre jugues (si el mòbil ho permet)
+let wake=null;
+async function encen(){try{if(!wake&&navigator.wakeLock){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>{wake=null;});}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&foratEnJoc()) encen();});
 function pintaPals(){
   const ps=distPals();
   document.getElementById('pals').innerHTML=`<tr><th>Pal</th><th>Historial</th><th>Aquí</th><th>Ara</th></tr>`
@@ -590,7 +645,7 @@ if(navigator.geolocation){
     if(ma) return;
     jo=[pos.coords.latitude,pos.coords.longitude];precisio=pos.coords.accuracy;
     const n=foratPerTee(jo);
-    if(n&&n!==cfg.forat&&!copEnCurs){cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}else pinta();
+    if(n&&n!==cfg.forat&&!foratEnJoc()){cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}else pinta();
   },()=>{document.getElementById('gps').innerHTML='<span class="av">Sense GPS: toca ✋ i marca on ets al mapa</span>';},
   {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
 }
