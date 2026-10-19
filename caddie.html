@@ -589,6 +589,13 @@ function pega(pal){
 function alGreen(){if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
   const f=foratR(cfg.forat);f.green=jo.slice();desaRonda();pinta();}
 function putts(n){const f=foratR(cfg.forat);f.putts=n;if(!f.green&&jo) f.green=jo.slice();desaRonda();pinta();}
+// tancar el forat: desa els cops i els putts i passa al forat següent (sense putts, els demana)
+function tancaForat(){
+  const f=foratR(cfg.forat);
+  if(!f.cops.length){alert('Encara no hi ha cap cop en aquest forat.');return;}
+  if(f.putts==null){alert('Toca abans els putts (0p-4p): si no hi ha la bola al green, toca «Bola al green» primer.');return;}
+  f.tancat=true;desaRonda();if(cfg.forat<18) canviaForat(1);else pinta();
+}
 function penal(){const f=foratR(cfg.forat);f.pen=(f.pen||0)+1;desaRonda();pinta();}
 function desfes(){const f=foratR(cfg.forat);
   if(f.putts!=null) f.putts=null; else if(f.green) f.green=null; else if(f.pen) f.pen--; else f.cops.pop();desaRonda();pinta();}
@@ -608,8 +615,6 @@ function pintaCop(){
       ${d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="noCompta(${i})" title="Compta o no per a la distància del pal">${c?'⊘':'✓'}</button>`:''}
       ${d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="metresCop(${i})" title="Corregeix els metres">✎</button>`:''}</span></div>`;};
   const fet=f.putts!=null,total=f.cops.length+(f.putts||0)+(f.pen||0),par=HP().par;
-  const ro_=rondes[avui()]||{},fets_=Object.entries(ro_).filter(([n,x])=>x.putts!=null);
-  const ronda=fets_.length?resPar(fets_.reduce((s,[n])=>s+copsForat(n)-PC.holes[n].par,0)):'';
   el.innerHTML=(ks.length?`<div class="llista">${ks.map(fila).join('')}</div>`:'<div class="nota" style="margin:0 0 4px">A cada bola, toca el pal amb què jugues des d\'allà: es desa la posició.</div>')
     +(f.green?`<div class="nota">⛳ Bola al green${f.pen?` · ${f.pen} de penalització`:''}${fet?` · ${f.putts} putts → <b>${total} cops</b> (${resPar(total-par)})`:''}</div>`:'')
     +(f.pen&&!f.green?`<div class="nota">${f.pen} de penalització</div>`:'')
@@ -617,9 +622,7 @@ function pintaCop(){
     <div class="fila"><button class="bt verd" onclick="alGreen()">⛳ Bola al green</button>
       ${f.green?[0,1,2,3,4].map(n=>`<button class="xip${f.putts===n?' on':''}" onclick="putts(${n})">${n}p</button>`).join(''):''}</div>
     <div class="fila" style="align-items:center"><button class="bt" onclick="penal()">+1 penalització</button><button class="bt" onclick="desfes()">↩ Desfés</button>
-      <div style="margin-left:auto;text-align:center;background:var(--pan2);border-radius:12px;padding:4px 14px;line-height:1.1">
-        <div style="font-size:30px;font-weight:900;color:${fet?(total-par<0?'#8fe388':total-par>0?'#ff8a75':'#f3f6f1'):'#f4d35e'}">${total}</div>
-        <div class="nota" style="margin:0">${fet?resPar(total-par):'cops'} · par ${par}</div>${ronda?`<div class="nota" style="margin:0">ronda ${ronda}</div>`:''}</div></div>
+      <button class="bt verd" style="margin-left:auto" onclick="tancaForat()">✅ Forat fet</button></div>
     <div class="fila"><span class="nota" style="margin:8px 4px 0 0">Cop sense GPS: pal i metres</span>
       <select id="cop-pal" style="font:600 14px inherit;padding:6px;border-radius:8px">${ps.map(([c])=>`<option value="${c}">${nomPal(c)}</option>`).join('')}</select>
       <input id="cop-ma" type="number" inputmode="numeric" placeholder="m" style="width:70px;font:700 16px inherit;padding:6px;border-radius:8px;border:0">
