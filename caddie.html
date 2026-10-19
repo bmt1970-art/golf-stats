@@ -203,7 +203,7 @@ const nomVent=d=>BRUIXOLA[Math.round(d/45)%8];
 const NOMS={DRIVER:'D',WOOD_3:'3W',WOOD_5:'5W',WOOD_7:'7W',HYBRID_3:'3H',HYBRID_4:'4H',HYBRID_5:'5H',IRON_3:'3I',IRON_4:'4I',
   IRON_5:'5I',IRON_6:'6I',IRON_7:'7I',IRON_8:'8I',IRON_9:'9I',WEDGE_PITCHING:'PW',WEDGE_UTILITY:'UW',WEDGE_GAP:'GW',
   WEDGE_SAND:'SW',WEDGE_LOB:'LW'};
-const nomPal=c=>NOMS[c]||c;
+const nomPal=c=>NOMS[c]||{SAND:'Sand',PUTT:'Putt',PUTT_FR:'Putt (fringe)',PENALTY:'Penalty'}[c]||c;
 const HIST=(()=>{
   const st={},ara=new Date();
   Object.values(GPS_DATA).forEach(rs=>Object.values(rs).forEach(rd=>{
@@ -284,9 +284,9 @@ function dibuixaForat(centra){
   (h.poi||[]).forEach(p=>['reach','carry'].forEach(k=>{if(p[k]) L.circleMarker(ll(p[k]),{radius:3,color:'#000',weight:1,
     fillColor:p.type==='WATER'?'#4aa3ff':'#f2e6c9',fillOpacity:1,interactive:false}).addTo(capa);}));
   const fr=(rondes[avui()]||{})[cfg.forat];
-  if(fr&&fr.cops.length){const pts=fr.cops.map(k=>k.p).concat(fr.green?[fr.green]:[]);
+  if(fr&&fr.cops.length){const cs=fr.cops.filter(k=>k.pal!=='PENALTY'&&k.p),pts=cs.map(k=>k.p).concat(fr.green?[fr.green]:[]);
     L.polyline(pts,{color:'#ffd54f',weight:2,dashArray:'4 4',interactive:false}).addTo(capa);
-    fr.cops.forEach((k,i)=>{L.circleMarker(k.p,{radius:6,color:'#000',weight:1,fillColor:'#ffd54f',fillOpacity:1,interactive:false}).addTo(capa);
+    cs.forEach((k,i)=>{L.circleMarker(k.p,{radius:6,color:'#000',weight:1,fillColor:'#ffd54f',fillOpacity:1,interactive:false}).addTo(capa);
       et(k.p,`${i+1} ${nomPal(k.pal)}`,'#ffd54f').addTo(capa);});}
   Object.entries(hp.tees).forEach(([b,p])=>L.circleMarker(p,{radius:5,color:'#000',weight:1,
     fillColor:{blanc:'#fff',groc:'#f2d32b',blau:'#1f5fbf',vermell:'#d62828'}[b],fillOpacity:1,interactive:false}).addTo(capa));
@@ -384,7 +384,7 @@ function textRonda(){
   const ro=rondes[avui()]||{};
   Object.keys(ro).map(Number).sort((a,b)=>a-b).forEach(n=>{const f=ro[n];if(!f.cops.length&&f.putts==null) return;
     L.push(`Forat ${n} (par ${PC.holes[n].par}): `+copsDe(f).map(k=>`${nomPal(k.pal)}${k.d!=null?' '+m(k.d)+' m'+(Math.abs(k.dz)>=1?` (${signe(k.dz)} m)`:''):''}${k.no?' [no compta]':''}`).join(', ')
-      +(f.green?' · al green':'')+(f.pen?` · ${f.pen} pen.`:'')+(f.putts!=null?` · ${f.putts} putts → ${copsForat(n)} cops`:' · en joc'));});
+      +(f.tancat||f.putts!=null?` → ${copsForat(n)} cops`:' · en joc'));});
   const ara=Date.now(),meus=cops.filter(k=>ara-k.t<4*86400e3);
   if(meus.length){L.push('Cops entrats a mà (pal, metres, desnivell, vent al llarg, equivalent en pla i sense vent):');
     meus.forEach(k=>L.push(`- ${new Date(k.t).toLocaleDateString('ca-ES')} forat ${k.forat}: ${nomPal(k.pal)} ${k.d} m, ${signe(k.dz)} m, vent ${k.al} m/s, eq. ${k.eq} m${k.ma?' (entrat a mà)':''}`));}
@@ -421,7 +421,7 @@ async function exportaRonda(){
   const rond={};
   Object.entries(rondes).forEach(([data,ro])=>{rond[data]={};
     Object.entries(ro).forEach(([n,f])=>{if(!f.cops.length&&f.putts==null) return;
-      rond[data][n]={par:PC.holes[n].par,green:f.green,putts:f.putts,pen:f.pen||0,cops:copsDe(f).map(k=>({
+      rond[data][n]={par:PC.holes[n].par,guardat:!!f.tancat,total:copsForat(n),cops:copsDe(f).map(k=>({
         pal:k.pal,t:new Date(k.t).toISOString(),p:k.p,fi:k.fi||null,d:k.d!=null?Math.round(k.d):null,dm:k.dm||null,
         dz:k.dz!=null?+k.dz.toFixed(2):null,vent:k.w||null,vent_al:k.al!=null?+k.al.toFixed(2):null,eq:k.eq!=null?Math.round(k.eq):null,
         compta:compta(k),no:!!k.no,si:!!k.si}))};});});
@@ -563,25 +563,30 @@ function ventAuto(){ventMa=null;desa(CLAU_VENT,null);document.getElementById('ve
 // La posició del cop és la del GPS (o la marcada amb ✋). El cop següent, o la bola al green, en tanca la distància;
 // amb el desnivell i el vent del moment, en surt l'equivalent en pla i sense vent, que ajusta la distància del pal.
 const CLAU_RONDA='pano-caddie-rondes';
-let rondes=llegeix(CLAU_RONDA,{});                    // {data: {forat: {cops:[{pal,p,t,w,no}], green, putts, pen}}}
+// cada forat: la llista de cops en ordre, com al Golf Pad. Cada cop és un pal, Sand (des del búnquer), Putt, Putt des
+// del collarí (fringe) o Penalty; tots compten un cop. «Guardar» tanca el forat i passa al següent.
+let rondes=llegeix(CLAU_RONDA,{});                    // {data: {forat: {cops:[{pal,p,t,w,no,si,dm}], tancat}}}
 const rondaAvui=()=>(rondes[avui()]=rondes[avui()]||{});
-const foratR=n=>(rondaAvui()[n]=rondaAvui()[n]||{cops:[],green:null,putts:null,pen:0});
+const foratR=n=>(rondaAvui()[n]=rondaAvui()[n]||{cops:[],tancat:false});
 const desaRonda=()=>desa(CLAU_RONDA,rondes);
-const foratEnJoc=()=>{const f=(rondes[avui()]||{})[cfg.forat];return !!(f&&f.cops.length&&f.putts==null);};
-// els cops d'un forat amb la distància (fins al cop següent o fins a la bola al green)
+const foratEnJoc=()=>{const f=(rondes[avui()]||{})[cfg.forat];return !!(f&&f.cops.length&&!f.tancat);};
+// la distància de cada cop: fins a la posició del cop següent (les penalitzacions no tenen posició pròpia)
 function copsDe(f){
-  return f.cops.map((k,i)=>{
-    const fi=i+1<f.cops.length?f.cops[i+1].p:f.green;
-    if(!fi) return{...k};
+  const ks=f.cops;
+  return ks.map((k,i)=>{
+    if(k.pal==='PENALTY') return{...k};
+    let fi=null;for(let j=i+1;j<ks.length;j++) if(ks[j].pal!=='PENALTY'&&ks[j].p){fi=ks[j].p;break;}
+    if(!fi&&f.green) fi=f.green;                       // rondes velles: bola al green
+    if(!fi||!k.p) return{...k};
     const d=dist(k.p,fi),zi=cota(k.p),zf=cota(fi),dz=(zi!=null&&zf!=null)?zf-zi:0,al=componentsVent(k.w,rumb(k.p,fi)).al;
     const dd=k.dm||d;
     return{...k,fi,d:dd,dz,al,eq:dd*fVent(al)+dz};
   });
 }
-// un cop compta per a la distància del pal si és sencer: no marcat «no compta», i almenys el 75 % del que fa el pal
-// (un approach a mig swing no ha d'escurçar el pal); amb ✓ es força
+// un cop compta per a la distància del pal si és d'un pal (no Sand, Putt ni Penalty), sencer i no marcat «no compta»:
+// almenys el 75 % del que fa el pal (un approach a mig swing no ha d'escurçar el pal); amb ✓ es força
 const parcial=k=>k.d!=null&&HIST[k.pal]&&k.eq<0.75*HIST[k.pal].m;
-const compta=k=>k.d!=null&&k.d>=15&&!k.no&&(k.si||!parcial(k));
+const compta=k=>!!HIST[k.pal]&&k.d!=null&&k.d>=15&&!k.no&&(k.si||!parcial(k));
 // tots els cops que compten per als pals: els entrats a mà i els de les rondes dels darrers 4 dies
 function totsCops(){
   const r=cops.slice(),lim=new Date(Date.now()-4*86400e3).toISOString().slice(0,10);
@@ -590,24 +595,20 @@ function totsCops(){
   return r;
 }
 function pega(pal){
-  if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
-  const f=foratR(cfg.forat);if(f.putts!=null){f.putts=null;}
-  if(f.green){f.green=null;}
-  f.cops.push({pal,p:jo.slice(),t:Date.now(),w:ventAra()});desaRonda();encen();pinta();
+  const f=foratR(cfg.forat);
+  if(pal==='PENALTY'){const ult=[...f.cops].reverse().find(k=>k.p);f.cops.push({pal,p:jo?jo.slice():ult?ult.p:null,t:Date.now(),w:ventAra()});}
+  else{if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
+    f.cops.push({pal,p:jo.slice(),t:Date.now(),w:ventAra()});}
+  f.tancat=false;desaRonda();encen();pinta();
 }
-function alGreen(){if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
-  const f=foratR(cfg.forat);f.green=jo.slice();desaRonda();pinta();}
-function putts(n){const f=foratR(cfg.forat);f.putts=n;if(!f.green&&jo) f.green=jo.slice();desaRonda();pinta();}
-// tancar el forat: desa els cops i els putts i passa al forat següent (sense putts, els demana)
-function tancaForat(){
+// desfer: treu l'últim cop (o torna a obrir el forat si ja era guardat)
+function desfes(){const f=foratR(cfg.forat);if(f.tancat) f.tancat=false;else f.cops.pop();desaRonda();pinta();}
+// guardar: tanca el forat amb els cops que hi ha i passa al següent
+function guardaForat(){
   const f=foratR(cfg.forat);
   if(!f.cops.length){alert('Encara no hi ha cap cop en aquest forat.');return;}
-  if(f.putts==null){alert('Toca abans els putts (0p-4p): si no hi ha la bola al green, toca «Bola al green» primer.');return;}
   f.tancat=true;desaRonda();if(cfg.forat<18) canviaForat(1);else pinta();
 }
-function penal(){const f=foratR(cfg.forat);f.pen=(f.pen||0)+1;desaRonda();pinta();}
-function desfes(){const f=foratR(cfg.forat);
-  if(f.putts!=null) f.putts=null; else if(f.green) f.green=null; else if(f.pen) f.pen--; else f.cops.pop();desaRonda();pinta();}
 // ⊘ / ✓: canvia si el cop compta per a la distància del pal
 function noCompta(i){const f=foratR(cfg.forat),k=f.cops[i],ara=compta(copsDe(f)[i]);
   if(ara){k.no=true;k.si=false;}else{k.no=false;k.si=true;}desaRonda();pinta();}
@@ -616,28 +617,24 @@ function metresCop(i){const f=foratR(cfg.forat),k=copsDe(f)[i];if(k.d==null) ret
   if(v&&+v>0){f.cops[i].dm=+v;desaRonda();pinta();}}
 const copsForat=n=>{const f=(rondes[avui()]||{})[n];return f?f.cops.length+(f.putts||0)+(f.pen||0):0;};
 function pintaCop(){
-  const el=document.getElementById('cop'),f=(rondes[avui()]||{})[cfg.forat]||{cops:[],green:null,putts:null,pen:0},ks=copsDe(f),ps=distPals();
-  const fila=(k,i)=>{const dm=k.dm||null,d=dm||k.d;
-    const c=compta(k);
-    return `<div><span class="n">${i+1}. <b>${nomPal(k.pal)}</b>${d!=null&&!c?(k.no?' <i>(no compta)</i>':' <i>(parcial, no compta)</i>'):''}</span><span class="v">${d!=null?m(d)+' m':'…'}`
-      +(d!=null&&Math.abs(k.eq-k.d)>=1&&!dm?`<small>en pla ${m(k.eq)}</small>`:'')+`
-      ${d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="noCompta(${i})" title="Compta o no per a la distància del pal">${c?'⊘':'✓'}</button>`:''}
-      ${d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="metresCop(${i})" title="Corregeix els metres">✎</button>`:''}</span></div>`;};
-  const fet=f.putts!=null,total=f.cops.length+(f.putts||0)+(f.pen||0),par=HP().par;
+  const el=document.getElementById('cop'),f=(rondes[avui()]||{})[cfg.forat]||{cops:[]},ks=copsDe(f),ps=distPals();
+  const fila=(k,i)=>{const dm=k.dm||null,d=dm||k.d,club=!!HIST[k.pal],c=compta(k);
+    return `<div><span class="n">${i+1}. <b>${nomPal(k.pal)}</b>${club&&d!=null&&!c?(k.no?' <i>(no compta)</i>':' <i>(parcial, no compta)</i>'):''}</span><span class="v">${d!=null?m(d)+' m':k.pal==='PENALTY'||(f.tancat&&i===ks.length-1)?'':'…'}`
+      +(club&&d!=null&&Math.abs(k.eq-k.d)>=1&&!dm?`<small>en pla ${m(k.eq)}</small>`:'')+`
+      ${club&&d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="noCompta(${i})" title="Compta o no per a la distància del pal">${c?'⊘':'✓'}</button>`:''}
+      ${club&&d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="metresCop(${i})" title="Corregeix els metres">✎</button>`:''}</span></div>`;};
   el.innerHTML=(ks.length?`<div class="llista">${ks.map(fila).join('')}</div>`:'<div class="nota" style="margin:0 0 4px">A cada bola, toca el pal amb què jugues des d\'allà: es desa la posició.</div>')
-    +(f.green?`<div class="nota">⛳ Bola al green${f.pen?` · ${f.pen} de penalització`:''}${fet?` · ${f.putts} putts → <b>${total} cops</b> (${resPar(total-par)})`:''}</div>`:'')
-    +(f.pen&&!f.green?`<div class="nota">${f.pen} de penalització</div>`:'')
+    +(f.tancat?'<div class="nota">✅ Forat guardat.</div>':'')
     +`<div class="fila">${ps.map(([c])=>`<button class="xip" onclick="pega('${c}')">${nomPal(c)}</button>`).join('')}</div>
-    <div class="fila"><button class="bt verd" onclick="alGreen()">⛳ Bola al green</button>
-      ${f.green?[0,1,2,3,4].map(n=>`<button class="xip${f.putts===n?' on':''}" onclick="putts(${n})">${n}p</button>`).join(''):''}</div>
-    <div class="fila" style="align-items:center"><button class="bt" onclick="penal()">+1 penalització</button><button class="bt" onclick="desfes()">↩ Desfés</button>
-      <button class="bt verd" style="margin-left:auto" onclick="tancaForat()">✅ Forat fet</button></div>
+    <div class="fila"><button class="xip" onclick="pega('SAND')">Sand</button><button class="xip" onclick="pega('PUTT')">Putt</button>
+      <button class="xip" onclick="pega('PUTT_FR')">Putt (fringe)</button><button class="xip" onclick="pega('PENALTY')">Penalty</button>
+      <button class="xip" onclick="desfes()">↩ Desfer</button><button class="xip" style="background:#2e7d32" onclick="guardaForat()">💾 Guardar</button></div>
     <div class="fila"><span class="nota" style="margin:8px 4px 0 0">Cop sense GPS: pal i metres</span>
       <select id="cop-pal" style="font:600 14px inherit;padding:6px;border-radius:8px">${ps.map(([c])=>`<option value="${c}">${nomPal(c)}</option>`).join('')}</select>
       <input id="cop-ma" type="number" inputmode="numeric" placeholder="m" style="width:70px;font:700 16px inherit;padding:6px;border-radius:8px;border:0">
       <button class="bt" onclick="copAMa()">Afegeix</button></div>`;
-  // resultat de la ronda a la línia d'estat
-  const ro=rondes[avui()]||{},fets=Object.entries(ro).filter(([n,x])=>x.putts!=null);
+  // resultat de la ronda a la línia d'estat (forats guardats)
+  const ro=rondes[avui()]||{},fets=Object.entries(ro).filter(([n,x])=>x.tancat||x.putts!=null);
   if(fets.length){const tot=fets.reduce((s,[n])=>s+copsForat(n),0),pars=fets.reduce((s,[n])=>s+PC.holes[n].par,0);
     document.getElementById('desn').textContent+=` · Ronda ${tot} (${resPar(tot-pars)}, ${fets.length} forats)`;}
 }
