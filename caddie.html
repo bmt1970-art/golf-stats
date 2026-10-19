@@ -153,6 +153,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <button class="bt" onclick="obrePutt()">🎯 Putt</button>
     <button class="bt" onclick="obreBanderes()">🚩 Posició de banderes d'avui</button>
     <button class="bt" onclick="obreFullBanderes()">📋 Full de banderes (xx/yyL)</button>
+    <button class="bt" id="bt-estalvi" onclick="toggleEstalvi()">🔋 Estalvi</button>
     <button class="bt" onclick="comparteix()">📤 Comparteix la ronda</button>
     <button class="bt" onclick="exportaRonda()">📦 Exporta la ronda</button>
     <button class="bt" onclick="esborraCops()">Esborra els cops del cap de setmana</button>
@@ -272,7 +273,14 @@ function recomana(dJugar){
 // ── risc: dispersió de cada pal (longitud: la ± de l'historial; lateral: un 7 % de la distància) ──
 const OBS=(()=>{const o=PC.obst||{b:[],a:[]},caixa=pol=>{let s=90,n=-90,w=180,e=-180;pol.forEach(([a,b])=>{s=Math.min(s,a);n=Math.max(n,a);w=Math.min(w,b);e=Math.max(e,b);});return[s,n,w,e];};
   return{b:o.b.map(p=>({p,c:caixa(p)})),a:o.a.map(p=>({p,c:caixa(p)})),aprox:o.font_a!=='dxf'};})();
+const RISC_CAU=new Map();
 function risc(o,pal,obj){
+  const w=ventAra(),clau=[o[0].toFixed(5),o[1].toFixed(5),pal,obj[0].toFixed(6),obj[1].toFixed(6),w?w.v.toFixed(1)+'/'+Math.round(w.d):'-',
+    (distPals().find(x=>x[0]===pal)||[,{m:0}])[1].m.toFixed(1)].join('|');
+  if(RISC_CAU.has(clau)) return RISC_CAU.get(clau);
+  const r=riscCalc(o,pal,obj);if(RISC_CAU.size>300) RISC_CAU.clear();RISC_CAU.set(clau,r);return r;
+}
+function riscCalc(o,pal,obj){
   // on apunta: cap a l'objectiu, amb la distància que fa el pal (llargada a jugar convertida a metres reals)
   const ps=Object.fromEntries(distPals()),i=ps[pal];if(!i) return null;
   const rb=rumb(o,obj),dObj=dist(o,obj),a=aJugar(obj),k=dObj/Math.max(1,a.j);      // metres reals per metre jugat
@@ -650,9 +658,11 @@ function pinta(centra){
   document.querySelectorAll('[data-b]').forEach(b=>b.classList.toggle('on',b.dataset.b===cfg.barra));
   document.getElementById('btn-ma').classList.toggle('on',ma);
   const g=h.green, o=origen();
-  document.getElementById('gps').innerHTML=jo&&!aprop()?`<span class="av">Ets lluny del camp: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`
-    :jo?(precisio!=null?`GPS ±${m(precisio)} m`:'Posició marcada a mà')
-    :`<span class="av">Sense posició: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`;
+  document.getElementById('bt-estalvi').classList.toggle('on',estalvi);
+  document.getElementById('bt-estalvi').textContent=estalvi?'🔋 Estalvi: activat':'🔋 Estalvi';
+  document.getElementById('gps').innerHTML=(estalvi?'<button class="bt" style="padding:2px 8px;margin-right:6px" onclick="posicioAra()">📍</button>':'')+(jo&&!aprop()?`<span class="av">Ets lluny del camp: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`
+    :jo?(precisio!=null?`GPS ±${m(precisio)} m${estalvi?' · estalvi':''}`:'Posició marcada a mà')
+    :`<span class="av">Sense posició: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`);
   // green
   [['f','front'],['c','middle'],['b','back']].forEach(([id,k])=>{
     if(!g[k]){document.getElementById('d-'+id).textContent='–';document.getElementById('j-'+id).textContent='';return;}
@@ -767,6 +777,7 @@ function totsCops(){
   return r;
 }
 function pega(pal){
+  if(estalvi&&!ma&&pal!=='PENALTY'&&!pega.fet){pega.fet=true;posicioAra(()=>{pega(pal);pega.fet=false;});return;}
   const f=foratR(cfg.forat);
   if(pal==='PENALTY'){const ult=[...f.cops].reverse().find(k=>k.p);f.cops.push({pal,p:jo?jo.slice():ult?ult.p:null,t:Date.now(),w:ventAra()});}
   else{if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
@@ -817,8 +828,8 @@ function copAMa(){
 function esborraCops(){if(confirm('Esborro els cops entrats a mà i les rondes desades en aquest mòbil?')){cops=[];rondes={};desa(CLAU_COPS,cops);desaRonda();pinta();}}
 // pantalla sempre encesa mentre jugues (si el mòbil ho permet)
 let wake=null;
-async function encen(){try{if(!wake&&navigator.wakeLock){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>{wake=null;});}}catch(e){}}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&foratEnJoc()) encen();});
+async function encen(){try{if(!estalvi&&!wake&&navigator.wakeLock){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>{wake=null;});}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&foratEnJoc()&&!estalvi) encen();});
 function pintaPals(){
   const ps=distPals();
   document.getElementById('pals').innerHTML=`<tr><th>Pal</th><th>Historial</th><th>Aquí</th><th>Ara</th></tr>`
@@ -874,15 +885,41 @@ function foratPerTee(p){
   for(const [n,hp] of Object.entries(PC.holes)) for(const t of Object.values(hp.tees)) if(dist(p,t)<12) return +n;
   return null;
 }
-if(navigator.geolocation){
-  navigator.geolocation.watchPosition(pos=>{
-    if(ma) return;
-    jo=[pos.coords.latitude,pos.coords.longitude];precisio=pos.coords.accuracy;
-    const n=foratPerTee(jo);
-    if(n&&n!==cfg.forat&&!foratEnJoc()){cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}else pinta();
-  },()=>{document.getElementById('gps').innerHTML='<span class="av">Sense GPS: toca ✋ i marca on ets al mapa</span>';},
-  {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+// ── GPS i bateria ──
+// Normal: seguiment continu, però la pantalla només es repinta si t'has mogut 3 m o més.
+// Estalvi (🔋): sense seguiment continu; la posició es demana en obrir la pantalla, en tocar un pal i amb «📍»,
+// i la pantalla no es manté encesa.
+const CLAU_ESTALVI='pano-caddie-estalvi';
+let estalvi=llegeix(CLAU_ESTALVI,false), vigila=null, ultPinta=null;
+function novaPos(pos,forca){
+  if(ma) return;
+  const p=[pos.coords.latitude,pos.coords.longitude],acc=pos.coords.accuracy;
+  const mogut=!ultPinta||dist(ultPinta.p,p)>=3||Math.abs((ultPinta.acc||0)-acc)>=5;
+  jo=p;precisio=acc;
+  const n=foratPerTee(jo);
+  if(n&&n!==cfg.forat&&!foratEnJoc()){cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);ultPinta={p,acc};pinta(true);return;}
+  if(mogut||forca){ultPinta={p,acc};pinta();}
 }
+const errGPS=()=>{document.getElementById('gps').innerHTML='<span class="av">Sense GPS: toca ✋ i marca on ets al mapa</span>';};
+function engegaGPS(){
+  if(!navigator.geolocation) return;
+  if(vigila!=null){navigator.geolocation.clearWatch(vigila);vigila=null;}
+  if(!estalvi) vigila=navigator.geolocation.watchPosition(p=>novaPos(p),errGPS,{enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+  else posicioAra();
+}
+// una sola lectura del GPS (mode estalvi): la més precisa que doni en uns segons
+function posicioAra(cb){
+  if(!navigator.geolocation){cb&&cb();return;}
+  document.getElementById('gps').textContent='Buscant la posició…';
+  navigator.geolocation.getCurrentPosition(p=>{novaPos(p,true);cb&&cb();},()=>{errGPS();cb&&cb();},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+}
+function toggleEstalvi(){
+  estalvi=!estalvi;desa(CLAU_ESTALVI,estalvi);
+  if(estalvi&&wake){try{wake.release();}catch(e){}wake=null;}
+  engegaGPS();pinta();
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&estalvi) posicioAra();});
+engegaGPS();
 const q=new URLSearchParams(location.search);if(q.get('forat')){cfg.forat=Math.min(18,Math.max(1,+q.get('forat')));}
 pinta(true);carregaPrevisio();estatPlanol();pintaUrlClaude();
 // versió de l'app (la del service worker) i si el mapa es pot girar en aquest mòbil
