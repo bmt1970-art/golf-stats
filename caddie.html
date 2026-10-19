@@ -86,7 +86,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <div class="caixa"><div class="et">Fons</div><div class="m" id="d-b">–</div><div class="j" id="j-b"></div></div>
   </div>
   <div class="pal" id="pal"></div>
-  <h3>Cops d'aquest forat</h3>
+  <h3>Cops d'aquest forat <button class="bt" style="float:right;padding:4px 9px;margin-top:-6px" onclick="enviaClaude()">💬 Envia a Claude</button></h3>
   <div id="cop"></div>
   <div class="cop" style="margin-top:8px">🚩 Bandera: <span id="band-txt"></span>
     <div class="fila" id="zones-xips"></div>
@@ -122,9 +122,15 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <button class="bt" id="bt-planol" onclick="desaPlanol()">📥 Desa el plànol al mòbil</button>
     <button class="bt" onclick="obrePutt()">🎯 Putt</button>
     <button class="bt" onclick="obreBanderes()">🚩 Posició de banderes d'avui</button>
-    <button class="bt" onclick="comparteix()">📤 Passa la ronda a Claude</button>
+    <button class="bt" onclick="enviaClaude()">💬 Envia a Claude</button>
+    <button class="bt" onclick="comparteix()">📤 Comparteix la ronda</button>
+    <button class="bt" onclick="exportaRonda()">📦 Exporta la ronda</button>
     <button class="bt" onclick="esborraCops()">Esborra els cops del cap de setmana</button>
   </div>
+  <div class="fila" style="align-items:center"><span class="nota" style="margin:0">Enllaç de la sessió de Claude:</span>
+    <input id="url-claude" type="url" placeholder="https://claude.ai/…" style="flex:1;min-width:160px;font:14px inherit;padding:7px;border-radius:8px;border:0">
+    <button class="bt" onclick="desaUrlClaude()">Desa</button></div>
+  <div class="nota" id="url-claude-estat" style="margin-top:2px"></div>
   <p class="nota">«A jugar» és la distància corregida pel desnivell (1 m de pujada ≈ 1 m més) i pel vent
   (de cara, +2,2 % per m/s; de cua, −1,1 % per m/s). El desnivell surt del LiDAR del PNOA (2023) i el vent,
   d'Open-Meteo a 10 m d'alçada, si no el poses a mà. Les distàncies dels pals són les de les teves partides
@@ -364,7 +370,7 @@ function banderaDe(n){
   return ref?{...ref,dins:true}:null;
 }
 // la ronda en text, per passar-la a Claude (l'app del mòbil) i analitzar-la o actualitzar el caddie
-async function comparteix(){
+function textRonda(){
   const L=[`Ronda al Panorámica Golf, ${new Date().toLocaleString('ca-ES')}. Barres ${cfg.barra}.`];
   const w=ventAra();if(w) L.push(`Vent: ${w.v.toFixed(1)} m/s del ${nomVent(w.d)} (${w.font}).`);
   if(banderesDia.data===avui()){
@@ -380,9 +386,51 @@ async function comparteix(){
   if(meus.length){L.push('Cops entrats a mà (pal, metres, desnivell, vent al llarg, equivalent en pla i sense vent):');
     meus.forEach(k=>L.push(`- ${new Date(k.t).toLocaleDateString('ca-ES')} forat ${k.forat}: ${nomPal(k.pal)} ${k.d} m, ${signe(k.dz)} m, vent ${k.al} m/s, eq. ${k.eq} m${k.ma?' (entrat a mà)':''}`));}
   L.push('Distàncies dels pals ara (historial · cap de setmana · combinada): '+distPals().map(([c,i])=>`${nomPal(c)} ${m(i.hist)}·${i.nc?m(i.cap)+'('+i.nc+')':'-'}·${m(i.m)}`).join(', '));
-  const text=L.join('\n');
+  return L.join('\n');
+}
+async function comparteix(){
+  const text=textRonda();
   try{if(navigator.share){await navigator.share({title:'Ronda al Panorámica',text});return;}}catch(e){if(e.name==='AbortError') return;}
   try{await navigator.clipboard.writeText(text);alert('Copiat: enganxa-ho a Claude.');}catch(e){prompt('Copia aquest text i enganxa\'l a Claude:',text);}
+}
+// «Envia a Claude»: copia la ronda i obre la sessió de Claude Code (Control remot); allà s'enganxa i s'envia
+const CLAU_URL='pano-caddie-claude-url';
+const urlClaude=()=>{try{return localStorage.getItem(CLAU_URL)||'';}catch(e){return '';}};
+function desaUrlClaude(){
+  const v=document.getElementById('url-claude').value.trim();
+  if(v&&!/^(https:\/\/claude\.ai\/|claude:\/\/)/.test(v)){alert("Ha de ser un enllaç de Claude (https://claude.ai/…).");return;}
+  try{v?localStorage.setItem(CLAU_URL,v):localStorage.removeItem(CLAU_URL);}catch(e){}
+  pintaUrlClaude();
+}
+function pintaUrlClaude(){const u=urlClaude();document.getElementById('url-claude').value=u;
+  document.getElementById('url-claude-estat').textContent=u?'Desat.':"Enganxa-hi l'enllaç de la sessió «Caddie Panorámica en directe».";}
+async function enviaClaude(){
+  const u=urlClaude();
+  if(!u){alert("Primer desa l'enllaç de la sessió de Claude a Opcions.");document.getElementById('url-claude').scrollIntoView({block:'center'});return;}
+  const text=textRonda();
+  let copiat=false;try{await navigator.clipboard.writeText(text);copiat=true;}catch(e){}
+  if(!copiat){prompt('Copia aquest text i enganxa\'l a Claude:',text);}
+  window.open(u,'_blank');
+}
+// «Exporta la ronda»: el fitxer complet (posicions de cada cop, vent, desnivell, banderes, làser, resultat) per
+// desar-lo a Drive o enviar-lo per correu i incorporar-lo a l'app des de Claude Code
+async function exportaRonda(){
+  const rond={};
+  Object.entries(rondes).forEach(([data,ro])=>{rond[data]={};
+    Object.entries(ro).forEach(([n,f])=>{if(!f.cops.length&&f.putts==null) return;
+      rond[data][n]={par:PC.holes[n].par,green:f.green,putts:f.putts,pen:f.pen||0,cops:copsDe(f).map(k=>({
+        pal:k.pal,t:new Date(k.t).toISOString(),p:k.p,fi:k.fi||null,d:k.d!=null?Math.round(k.d):null,dm:k.dm||null,
+        dz:k.dz!=null?+k.dz.toFixed(2):null,vent:k.w||null,vent_al:k.al!=null?+k.al.toFixed(2):null,eq:k.eq!=null?Math.round(k.eq):null,
+        compta:compta(k),no:!!k.no,si:!!k.si}))};});});
+  const dades={tipus:'caddie-panoramica',versio:1,exportat:new Date().toISOString(),camp:CAMP,barra:cfg.barra,
+    banderes:banderesDia,laser:Object.fromEntries(Object.keys(bandera).map(n=>{const b=banderaDe(+n);return[n,{D:b.D,o:b.o,p:b.p,dins:b.dins}];})),
+    rondes:rond,cops_a_ma:cops,pals:Object.fromEntries(distPals().map(([c,i])=>[c,{historial:Math.round(i.hist),n_hist:i.nh,cap_de_setmana:i.cap!=null?Math.round(i.cap):null,n:i.nc,ara:Math.round(i.m)}]))};
+  const nom=`ronda_panoramica_${avui()}.json`,blob=new Blob([JSON.stringify(dades,null,1)],{type:'application/json'});
+  const f=new File([blob],nom,{type:'application/json'});
+  try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Ronda al Panorámica'});return;}}
+  catch(e){if(e.name==='AbortError') return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
 }
 function treuBandera(){delete bandera[cfg.forat];if(banderesDia.man[cfg.forat]){delete banderesDia.man[cfg.forat];desaBand();}document.getElementById('laser').value='';pinta();}
 function pintaLaser(){
@@ -650,7 +698,7 @@ if(navigator.geolocation){
   {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
 }
 const q=new URLSearchParams(location.search);if(q.get('forat')){cfg.forat=Math.min(18,Math.max(1,+q.get('forat')));}
-pinta(true);carregaPrevisio();estatPlanol();
+pinta(true);carregaPrevisio();estatPlanol();pintaUrlClaude();
 try{if(!banderesDia.data&&!sessionStorage.getItem('pano-band-ara-no')) obreBanderes();}catch(e){}
 // la previsió es refà cada 30 min (i al cap de 20 s si la primera no ha arribat)
 setTimeout(()=>{if(!previsio) carregaPrevisio();},20000);setInterval(carregaPrevisio,30*60e3);
