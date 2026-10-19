@@ -173,6 +173,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
 <script src="gps_all.js"></script>
 <script src="pano_caddie.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script>
 'use strict';
 const CAMP='Panoramica Golf';
@@ -316,7 +317,11 @@ function aJugar(p){
 }
 
 // ── mapa ──
-const mapa=L.map('mapa',{zoomControl:false,attributionControl:false,preferCanvas:true});
+// mapa girat: el tee a baix i el green a dalt (leaflet-rotate); la brúixola de la cantonada el torna al nord
+const GIR=typeof L.Map.prototype.setBearing==='function';
+const mapa=L.map('mapa',{zoomControl:false,attributionControl:false,preferCanvas:true,zoomSnap:0.25,
+  rotate:GIR,bearing:0,touchRotate:false,rotateControl:GIR?{closeOnZeroBearing:false,position:'topleft'}:false});
+mapa.setView(ll(GEO['1'].green.middle),16);      // amb el mapa girat, fitBounds necessita una vista inicial
 const RAJOLES={bounds:[[40.54355,0.355],[40.55607,0.37971]]};
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19}).addTo(mapa);
 // ortofoto PNOA 2024 del camp (rajoles pròpies, es poden desar al mòbil per jugar sense cobertura)
@@ -352,7 +357,18 @@ function dibuixaForat(centra){
   Object.entries(hp.tees).forEach(([b,p])=>L.circleMarker(p,{radius:5,color:'#000',weight:1,
     fillColor:{blanc:'#fff',groc:'#f2d32b',blau:'#1f5fbf',vermell:'#d62828'}[b],fillOpacity:1,interactive:false}).addTo(capa));
   if(centra){const pts=[...Object.values(hp.tees),...(g.contour||[ll(g.middle)])];if(jo&&dist(jo,ll(g.middle))<600) pts.push(jo);
-    mapa.fitBounds(pts,{padding:[18,18],animate:false});}
+    if(GIR){
+      // girat: el tee a baix i el green a dalt; el zoom, perquè hi càpiga tot el forat de llarg i d'ample
+      const t=hp.tees[cfg.barra]||ll(h.tee),rb=rumb(t,ll(g.middle));mapa.setBearing(-rb);
+      // extensió al llarg (a) i de través (t) de la línia de joc, des del centre del green; el centre de la vista, al mig
+      const g0=ll(g.middle),S=Math.sin(rb*rad),C=Math.cos(rb*rad);let a0=1e9,a1=-1e9,t0=1e9,t1=-1e9;
+      pts.forEach(q=>{const dx=(q[1]-g0[1])*DEM.k[0],dy=(q[0]-g0[0])*DEM.k[1],a=dx*S+dy*C,t=dx*C-dy*S;
+        a0=Math.min(a0,a);a1=Math.max(a1,a);t0=Math.min(t0,t);t1=Math.max(t1,t);});
+      const am=(a0+a1)/2,tm=(t0+t1)/2,ex=am*S+tm*C,ny=am*C-tm*S,c=[g0[0]+ny/DEM.k[1],g0[1]+ex/DEM.k[0]];
+      const sz=mapa.getSize(),mpp0=156543.03*Math.cos(c[0]*rad);
+      const z=Math.min(Math.log2(mpp0*Math.max(80,sz.y-30)/(a1-a0+16)),Math.log2(mpp0*Math.max(80,sz.x-30)/(t1-t0+16)),19);
+      mapa.setView(c,Math.floor(z*4)/4,{animate:false});
+    } else mapa.fitBounds(pts,{padding:[18,18],animate:false});}
 }
 let capaDesn=null, desnOn=false, bandera={}, mBand=null;
 function dibuixaDesn(){

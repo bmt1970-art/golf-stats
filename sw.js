@@ -1,4 +1,4 @@
-const CACHE = 'golf-stats-v106';
+const CACHE = 'golf-stats-v107';
 const FILES = ['./data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './manifest.json', './putt.webmanifest'];
 
 self.addEventListener('install', e => {
@@ -35,7 +35,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // Leaflet (unpkg): primer la memoria, i se'n desa copia, perque el mapa s'obri sense cobertura
-  if (url.hostname === 'unpkg.com' && url.pathname.includes('/leaflet@')) {
+  if (url.hostname === 'unpkg.com' && (url.pathname.includes('/leaflet@') || url.pathname.includes('/leaflet-rotate@'))) {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => {
       const c = x.clone(); caches.open(CACHE).then(k => k.put(e.request, c)); return x;
     })));
