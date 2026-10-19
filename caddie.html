@@ -161,6 +161,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <input id="url-claude" type="url" placeholder="https://claude.ai/…" style="flex:1;min-width:0;font:16px inherit;padding:7px;border-radius:8px;border:0">
     <button class="bt" onclick="desaUrlClaude()">Desa</button></div>
   <div class="nota" id="url-claude-estat" style="margin-top:2px"></div>
+  <div class="fila"><button class="bt" onclick="actualitza()">🔄 Força actualització</button><span class="nota" id="versio" style="margin:8px 0 0 4px"></span></div>
   <p class="nota">«A jugar» és la distància corregida pel desnivell (1 m de pujada ≈ 1 m més) i pel vent
   (de cara, +2,2 % per m/s; de cua, −1,1 % per m/s). El desnivell surt del LiDAR del PNOA (2023) i el vent,
   d'Open-Meteo a 10 m d'alçada, si no el poses a mà. Les distàncies dels pals són les de les teves partides
@@ -875,6 +876,14 @@ if(navigator.geolocation){
 }
 const q=new URLSearchParams(location.search);if(q.get('forat')){cfg.forat=Math.min(18,Math.max(1,+q.get('forat')));}
 pinta(true);carregaPrevisio();estatPlanol();pintaUrlClaude();
+// versió de l'app (la del service worker) i si el mapa es pot girar en aquest mòbil
+(async()=>{let v='?';try{v=(await caches.keys()).find(k=>k.startsWith('golf-stats-'))||'?';}catch(e){}
+  document.getElementById('versio').textContent=`${v.replace('golf-stats-','')} · mapa ${GIR?'girat':'sense gir'}`;})();
+async function actualitza(){
+  try{for(const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    for(const k of await caches.keys()) if(!k.startsWith('pano-rajoles')) await caches.delete(k);}catch(e){}
+  location.reload();
+}
 try{if(!banderesDia.data&&!sessionStorage.getItem('pano-band-ara-no')) obreBanderes();}catch(e){}
 // la previsió es refà cada 30 min (i al cap de 20 s si la primera no ha arribat)
 setTimeout(()=>{if(!previsio) carregaPrevisio();},20000);setInterval(carregaPrevisio,30*60e3);
