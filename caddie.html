@@ -26,7 +26,17 @@ body{display:flex;flex-direction:column}
 .baix{flex:1;overflow-y:auto;padding:8px 10px calc(env(safe-area-inset-bottom) + 12px);background:var(--fons)}
 .estat{color:var(--sub);font-size:12px;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
 .estat .av{color:var(--vm)}
-.green{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.dist{display:grid;grid-template-columns:1.15fr 1fr;gap:6px}
+.tres div{display:flex;align-items:baseline;gap:6px;background:var(--pan2);border-radius:10px;padding:6px 10px;margin-bottom:5px}
+.tres div:last-child{margin-bottom:0}
+.tres div.c{outline:2px solid var(--vd)}
+.tres .et{flex:1;font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.4px}
+.tres b{font-size:22px;font-weight:800}
+.tres small{color:var(--or);font-size:12px;min-width:58px;text-align:right}
+.caixa.band .m{font-size:40px}
+#pal{margin-top:6px;border-top:1px solid rgba(255,255,255,.12);padding-top:6px}
+#pal .p{font-size:30px;font-weight:900;color:var(--vd);line-height:1}
+#pal .t{font-size:11px;color:var(--sub);line-height:1.3;margin-top:2px}
 .caixa{background:var(--pan2);border-radius:12px;padding:8px 6px;text-align:center}
 .caixa .et{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.4px}
 .caixa .m{font-size:26px;font-weight:800;line-height:1.1}
@@ -81,13 +91,15 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <div class="fila"><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(1)">1</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(2)">2</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(3)">3</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(4)">4</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(5)">5</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(6)">6</button></div>
     <div class="fila"><button class="bt" onclick="desaPosicio(null)">No ho sé</button><button class="bt" onclick="amagaBanderes()">Ara no</button></div></div>
   <div class="estat"><span id="gps">Buscant GPS…</span><span id="desn"></span></div>
-  <div class="green">
-    <div class="caixa"><div class="et">Davant</div><div class="m" id="d-f">–</div><div class="j" id="j-f"></div></div>
-    <div class="caixa centre"><div class="et">Centre</div><div class="m" id="d-c">–</div><div class="j" id="j-c"></div></div>
-    <div class="caixa"><div class="et">Fons</div><div class="m" id="d-b">–</div><div class="j" id="j-b"></div></div>
-    <div class="caixa band"><div class="et" id="e-z">Bandera</div><div class="m" id="d-z">–</div><div class="j" id="j-z"></div></div>
+  <div class="dist">
+    <div class="tres">
+      <div><span class="et">Entrada</span><b id="d-f">–</b><small id="j-f"></small></div>
+      <div class="c"><span class="et">Centre</span><b id="d-c">–</b><small id="j-c"></small></div>
+      <div><span class="et">Final</span><b id="d-b">–</b><small id="j-b"></small></div>
+    </div>
+    <div class="caixa band"><div class="et" id="e-z">Bandera</div><div class="m" id="d-z">–</div><div class="j" id="j-z"></div>
+      <div id="pal"></div></div>
   </div>
-  <div class="pal" id="pal"></div>
   <h3>Cops d'aquest forat <button class="bt" style="float:right;padding:4px 9px;margin-top:-6px" onclick="enviaClaude()">💬 Envia a Claude</button></h3>
   <div id="cop"></div>
   <div class="vent" id="vent">Vent: carregant…</div>
@@ -495,14 +507,15 @@ function pinta(centra){
   if(bz){const a=aJugar(bz.p),D=bz.laser&&dist(o,bz.o)<=5?bz.D:a.d,jj=D*fVent(a.al)+a.dz;
     document.getElementById('e-z').textContent=bz.laser?'Làser':bz.z?'Zona '+bz.z:'Bandera';
     document.getElementById('d-z').textContent=m(D);document.getElementById('j-z').textContent=Math.abs(jj-D)>=1?`juga ${m(jj)}`:'';}
-  else{document.getElementById('e-z').textContent='Bandera';document.getElementById('d-z').textContent='–';document.getElementById('j-z').textContent='';}
+  else{const a=aJugar(ll(g.middle));document.getElementById('e-z').textContent='Centre del green';
+    document.getElementById('d-z').textContent=m(a.d);document.getElementById('j-z').textContent=Math.abs(a.j-a.d)>=1?`juga ${m(a.j)}`:'';}
   const c=aJugar(ll(g.middle));
   document.getElementById('desn').textContent=Math.abs(c.dz)>=0.5?`Green ${c.dz>0?'per sobre':'per sota'}: ${signe(c.dz)} m`:'Green a nivell';
-  // pal
-  const r=recomana(c.j);
-  const deriva=Math.abs(c.tr)>=1?` · el vent la mou ~${m(Math.abs(c.tr)*c.d*0.012)} m cap a ${c.tr>0?'la dreta':"l'esquerra"}`:'';
-  document.getElementById('pal').innerHTML=r?`<div class="p">${nomPal(r.c)}</div><div class="t">Al centre del green juga <b>${m(c.j)} m</b>
-    (${m(c.d)} reals${Math.abs(c.dz)>=0.5?`, ${signe(c.dz)} m de desnivell`:''}).<br>${nomPal(r.c)} fa ${m(r.m)} m${r.alt?` · ${nomPal(r.alt)} fa ${m(r.altm)} m`:''}${deriva}</div>`
+  // pal: cap a la bandera si se sap on és; si no, cap al centre del green
+  const obj=bz?aJugar(bz.p):c, jObj=bz?(bz.laser&&dist(o,bz.o)<=5?bz.D:obj.d)*fVent(obj.al)+obj.dz:c.j;
+  const r=recomana(jObj);
+  const deriva=Math.abs(obj.tr)>=1?` · vent: ~${m(Math.abs(obj.tr)*obj.d*0.012)} m cap a ${obj.tr>0?'la dreta':"l'esquerra"}`:'';
+  document.getElementById('pal').innerHTML=r?`<div class="p">${nomPal(r.c)}</div><div class="t">${nomPal(r.c)} fa ${m(r.m)}${r.alt?` · ${nomPal(r.alt)} ${m(r.altm)}`:''}${deriva}</div>`
     :'<div class="t">Sense dades dels pals</div>';
   // vent
   const w=ventAra();
