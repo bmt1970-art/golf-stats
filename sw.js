@@ -1,5 +1,5 @@
-const CACHE = 'golf-stats-v86';
-const FILES = ['./data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './manifest.json', './putt.webmanifest'];
+const CACHE = 'golf-stats-v87';
+const FILES = ['./data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './manifest.json', './putt.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -20,12 +20,20 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-  // putt.html: tambe des de xarxa, pero se'n desa copia per poder-la obrir sense cobertura al camp
-  if (url.pathname.endsWith('/putt.html')) {
+  // putt.html i caddie.html: tambe des de xarxa, pero se'n desa copia per poder-les obrir sense cobertura al camp
+  const pag = ['putt.html', 'caddie.html'].find(f => url.pathname.endsWith('/' + f));
+  if (pag) {
     e.respondWith(
-      fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(k => k.put('./putt.html', c)); return r; })
-        .catch(() => caches.match('./putt.html'))
+      fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(k => k.put('./' + pag, c)); return r; })
+        .catch(() => caches.match('./' + pag))
     );
+    return;
+  }
+  // Leaflet (unpkg): primer la memoria, i se'n desa copia, perque el mapa s'obri sense cobertura
+  if (url.hostname === 'unpkg.com' && url.pathname.includes('/leaflet@')) {
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => {
+      const c = x.clone(); caches.open(CACHE).then(k => k.put(e.request, c)); return x;
+    })));
     return;
   }
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));

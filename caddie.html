@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Caddie">
+<meta name="theme-color" content="#0e2a14">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Caddie Panorámica</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--fons:#0e2a14;--pan:#13261a;--pan2:#1b3423;--txt:#f3f6f1;--sub:#a9bba6;--or:#f4d35e;--vm:#ff8a75;--vd:#8fe388;--bl:#8ec5ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--fons);color:var(--txt);font:15px -apple-system,system-ui,sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column}
+.dalt{display:flex;gap:6px;align-items:center;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;background:var(--pan)}
+.dalt .forat{flex:1;text-align:center;line-height:1.15}
+.dalt .forat b{font-size:20px}
+.dalt .forat small{display:block;color:var(--sub);font-size:12px}
+.ico{background:var(--pan2);border:0;color:var(--txt);border-radius:10px;min-width:42px;height:42px;font-size:18px;padding:0 8px}
+.ico.on{background:var(--or);color:#222}
+#mapa{height:38vh;min-height:220px;background:#1d3b22}
+.baix{flex:1;overflow-y:auto;padding:8px 10px calc(env(safe-area-inset-bottom) + 12px);background:var(--fons)}
+.estat{color:var(--sub);font-size:12px;display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+.estat .av{color:var(--vm)}
+.green{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.caixa{background:var(--pan2);border-radius:12px;padding:8px 6px;text-align:center}
+.caixa .et{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.4px}
+.caixa .m{font-size:28px;font-weight:800;line-height:1.1}
+.caixa .j{font-size:12px;color:var(--or)}
+.caixa.centre{outline:2px solid var(--vd)}
+.pal{margin-top:8px;background:var(--pan2);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:12px}
+.pal .p{font-size:30px;font-weight:900;color:var(--vd);min-width:62px;text-align:center}
+.pal .t{font-size:13px;color:var(--sub);line-height:1.35}
+.pal .t b{color:var(--txt)}
+.vent{margin-top:8px;font-size:13px;color:var(--sub);background:var(--pan2);border-radius:12px;padding:8px 12px}
+.vent b{color:var(--txt)}
+h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin:12px 2px 4px}
+.llista div{display:flex;justify-content:space-between;align-items:baseline;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.07);font-size:14px}
+.llista .n{color:var(--sub);font-size:13px}
+.llista .v{font-weight:700}
+.llista .v small{font-weight:400;color:var(--or);margin-left:6px}
+.fila{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.bt{border:0;background:var(--pan2);color:var(--txt);padding:10px 12px;border-radius:10px;font:600 14px inherit}
+.bt.on{background:var(--or);color:#222}
+.bt.gran{flex:1;padding:12px;font-size:15px}
+.bt.verd{background:#2e7d32}
+.bt.vm{background:#8e2b1d}
+.xip{border:0;background:var(--pan2);color:var(--txt);padding:7px 9px;border-radius:9px;font:700 13px inherit;min-width:44px}
+.xip.on{background:var(--vd);color:#122}
+.cop{background:var(--pan2);border-radius:12px;padding:10px;margin-top:6px;font-size:14px}
+.cop input{width:80px;font:700 18px inherit;padding:6px;border-radius:8px;border:0;text-align:center}
+.taula{width:100%;border-collapse:collapse;font-size:13px}
+.taula td,.taula th{padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.07);text-align:right}
+.taula th{color:var(--sub);font-weight:600}
+.taula td:first-child,.taula th:first-child{text-align:left}
+.nota{color:var(--sub);font-size:11px;margin-top:10px;line-height:1.4}
+.q-et{color:#fff;font:700 11px/13px system-ui,sans-serif;text-align:center;text-shadow:0 0 3px #000,0 0 2px #000;pointer-events:none;white-space:nowrap}
+.leaflet-container{background:#1d3b22}
+</style>
+</head>
+<body>
+<div class="dalt">
+  <button class="ico" onclick="location.href='index.html'" title="Torna a Golf Stats">‹</button>
+  <button class="ico" id="ant" onclick="canviaForat(-1)">◀</button>
+  <div class="forat"><b id="titol">Forat 1</b><small id="subtitol"></small></div>
+  <button class="ico" id="seg" onclick="canviaForat(1)">▶</button>
+  <button class="ico" id="btn-ma" onclick="modeMa()" title="Situa't tocant el mapa">✋</button>
+</div>
+<div id="mapa"></div>
+<div class="baix">
+  <div class="estat"><span id="gps">Buscant GPS…</span><span id="desn"></span></div>
+  <div class="green">
+    <div class="caixa"><div class="et">Davant</div><div class="m" id="d-f">–</div><div class="j" id="j-f"></div></div>
+    <div class="caixa centre"><div class="et">Centre</div><div class="m" id="d-c">–</div><div class="j" id="j-c"></div></div>
+    <div class="caixa"><div class="et">Fons</div><div class="m" id="d-b">–</div><div class="j" id="j-b"></div></div>
+  </div>
+  <div class="pal" id="pal"></div>
+  <div class="vent" id="vent">Vent: carregant…</div>
+  <div class="fila" id="vent-ma" style="display:none"></div>
+
+  <h3 id="obj-tit" style="display:none">Punt marcat al mapa</h3>
+  <div class="llista" id="objectiu"></div>
+
+  <h3>Obstacles i referències del forat</h3>
+  <div class="llista" id="obstacles"></div>
+
+  <h3>Cop</h3>
+  <div id="cop"></div>
+
+  <h3>Els teus pals</h3>
+  <table class="taula" id="pals"></table>
+
+  <h3>Opcions</h3>
+  <div class="fila">
+    <span class="nota" style="margin:8px 4px 0 0">Barres:</span>
+    <button class="xip" data-b="blanc" onclick="triaBarra('blanc')">Blanques</button>
+    <button class="xip" data-b="groc" onclick="triaBarra('groc')">Grogues</button>
+    <button class="xip" data-b="blau" onclick="triaBarra('blau')">Blaves</button>
+    <button class="xip" data-b="vermell" onclick="triaBarra('vermell')">Vermelles</button>
+  </div>
+  <div class="fila">
+    <button class="bt" onclick="location.href='putt.html'">🎯 Putt</button>
+    <button class="bt" onclick="esborraCops()">Esborra els cops del cap de setmana</button>
+  </div>
+  <p class="nota">«A jugar» és la distància corregida pel desnivell (1 m de pujada ≈ 1 m més) i pel vent
+  (de cara, +2,2 % per m/s; de cua, −1,1 % per m/s). El desnivell surt del LiDAR del PNOA (2023) i el vent,
+  d'Open-Meteo a 10 m d'alçada, si no el poses a mà. Les distàncies dels pals són les de les teves partides
+  de Golf Pad dels dos últims anys (mitjana sense el 15 % de cada extrem, cop sencer amb el rodolament) i
+  s'ajusten amb els cops que entris aquí, que només es guarden en aquest mòbil. El GPS del mòbil té un error
+  de 3 a 5 m.</p>
+</div>
+
+<script src="course_geo.js"></script>
+<script src="gps_all.js"></script>
+<script src="pano_caddie.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+const CAMP='Panoramica Golf';
+const GEO=COURSE_GEO[CAMP];
+const PC=PANO_CADDIE;
+const CLAU_COPS='pano-caddie-cops', CLAU_VENT='pano-caddie-vent', CLAU_PREV='pano-caddie-previsio', CLAU_CFG='pano-caddie-cfg';
+const llegeix=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}};
+const desa=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
+
+// ── geometria ──
+const R=6371000, rad=Math.PI/180;
+function dist(a,b){const dL=(b[0]-a[0])*rad,dN=(b[1]-a[1])*rad;
+  const q=Math.sin(dL/2)**2+Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
+function rumb(a,b){const dL=(b[1]-a[1])*rad,r1=a[0]*rad,r2=b[0]*rad;
+  return(Math.atan2(Math.sin(dL)*Math.cos(r2),Math.cos(r1)*Math.sin(r2)-Math.sin(r1)*Math.cos(r2)*Math.cos(dL))/rad+360)%360;}
+const ll=p=>p&&p.lat!=null?[p.lat,p.lon]:p;
+// cota del terreny (bilineal sobre la malla de PANO_CADDIE.dem)
+const DEM=(()=>{const d=PC.dem,b=atob(d.d),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+  return{...d,z:new Uint16Array(u.buffer)};})();
+function cota(p){const e=(p[1]-DEM.o[1])*DEM.k[0]/DEM.pas,n=(p[0]-DEM.o[0])*DEM.k[1]/DEM.pas;
+  if(e<0||n<0||e>DEM.nx-1||n>DEM.ny-1) return null;
+  const i=Math.min(Math.floor(e),DEM.nx-2),j=Math.min(Math.floor(n),DEM.ny-2),fe=e-i,fn=n-j,Z=(a,b)=>DEM.z[b*DEM.nx+a];
+  return DEM.z0+((Z(i,j)*(1-fe)+Z(i+1,j)*fe)*(1-fn)+(Z(i,j+1)*(1-fe)+Z(i+1,j+1)*fe)*fn)/100;}
+
+// ── vent ──
+let previsio=llegeix(CLAU_PREV,null);                 // {t:[iso], v:[m/s], d:[graus], r:[ràfega]}
+let ventMa=llegeix(CLAU_VENT,null);                   // {v, d} posat a mà, o null
+async function carregaPrevisio(){
+  const c=ll(GEO['1'].green.middle);
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${c[0].toFixed(4)}&longitude=${c[1].toFixed(4)}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=ms&timezone=auto&forecast_days=7`;
+  try{const r=await fetch(url);const d=await r.json();
+    previsio={t:d.hourly.time,v:d.hourly.wind_speed_10m,d:d.hourly.wind_direction_10m,r:d.hourly.wind_gusts_10m,ara:new Date().toISOString()};
+    desa(CLAU_PREV,previsio);}catch(e){}
+  pinta();
+}
+function ventAra(){
+  if(ventMa) return{v:ventMa.v,d:ventMa.d,font:'a mà'};
+  if(!previsio) return null;
+  const ara=new Date();let millor=-1,dm=Infinity;
+  previsio.t.forEach((t,i)=>{const dd=Math.abs(new Date(t)-ara);if(dd<dm){dm=dd;millor=i;}});
+  if(millor<0||dm>3*3600e3) return null;
+  return{v:previsio.v[millor],d:previsio.d[millor],r:previsio.r[millor],font:'previsió'};
+}
+// component del vent al llarg del cop (+ a favor, − de cara) i de través (+ empeny cap a la dreta)
+function componentsVent(w,rumbCop){
+  if(!w) return{al:0,tr:0};
+  const cap=(w.d+180)%360, dif=((cap-rumbCop+540)%360-180)*rad;
+  return{al:w.v*Math.cos(dif),tr:w.v*Math.sin(dif)};
+}
+const fVent=al=>al<0?1+0.022*(-al):1-0.011*al;        // multiplicador de la distància a jugar
+const BRUIXOLA=['N','NE','E','SE','S','SO','O','NO'];
+const nomVent=d=>BRUIXOLA[Math.round(d/45)%8];
+
+// ── pals: historial de Golf Pad + cops del cap de setmana ──
+const NOMS={DRIVER:'D',WOOD_3:'3W',WOOD_5:'5W',WOOD_7:'7W',HYBRID_3:'3H',HYBRID_4:'4H',HYBRID_5:'5H',IRON_3:'3I',IRON_4:'4I',
+  IRON_5:'5I',IRON_6:'6I',IRON_7:'7I',IRON_8:'8I',IRON_9:'9I',WEDGE_PITCHING:'PW',WEDGE_UTILITY:'UW',WEDGE_GAP:'GW',
+  WEDGE_SAND:'SW',WEDGE_LOB:'LW'};
+const nomPal=c=>NOMS[c]||c;
+const HIST=(()=>{
+  const st={},ara=new Date();
+  Object.values(GPS_DATA).forEach(rs=>Object.values(rs).forEach(rd=>{
+    if((ara-new Date(rd.date))/3.156e10>2) return;
+    Object.values(rd.shots||{}).forEach(hs=>{for(let i=0;i<hs.length;i++){const s=hs[i];
+      if(!s.inStats||!s.lat||!NOMS[s.club]) continue;
+      let nx=null;for(let j=i+1;j<hs.length;j++) if(hs[j].lat){nx=hs[j];break;}
+      if(!nx) continue;const d=dist([s.lat,s.lon],[nx.lat,nx.lon]);
+      if(d<15||d>350) continue;(st[s.club]=st[s.club]||[]).push(d);}});
+  }));
+  const r={};
+  Object.entries(st).forEach(([c,a])=>{if(a.length<8) return;a.sort((x,y)=>x-y);
+    const t=a.length>6?Math.max(1,Math.floor(a.length*.15)):0,b=a.slice(t,a.length-t);
+    const m=b.reduce((x,y)=>x+y,0)/b.length,sd=Math.sqrt(b.reduce((x,y)=>x+(y-m)**2,0)/b.length);
+    r[c]={m,sd,n:a.length};});
+  return r;
+})();
+let cops=llegeix(CLAU_COPS,[]);                        // [{t, forat, pal, d, dz, al, eq}]
+function distPals(){
+  const r={};
+  Object.entries(HIST).forEach(([c,h])=>{
+    const meus=cops.filter(k=>k.pal===c&&!k.descartat);
+    const n0=Math.min(h.n,6), suma=meus.reduce((s,k)=>s+k.eq,0);
+    r[c]={hist:h.m,sd:h.sd,nh:h.n,nc:meus.length,cap:meus.length?suma/meus.length:null,m:(n0*h.m+suma)/(n0+meus.length)};
+  });
+  return Object.entries(r).sort((a,b)=>b[1].m-a[1].m);
+}
+function recomana(dJugar){
+  const ps=distPals();if(!ps.length) return null;
+  let b=null;ps.forEach(([c,i])=>{if(!b||Math.abs(i.m-dJugar)<Math.abs(b[1].m-dJugar)) b=[c,i];});
+  const idx=ps.findIndex(p=>p[0]===b[0]);
+  // l'alternativa: el pal del costat cap on queda la distància
+  const alt=dJugar>b[1].m?ps[idx-1]:ps[idx+1];
+  return{c:b[0],m:b[1].m,alt:alt?alt[0]:null,altm:alt?alt[1].m:null};
+}
+
+// ── estat ──
+let cfg=llegeix(CLAU_CFG,{forat:1,barra:'groc'});
+let jo=null, precisio=null, ma=false, objectiu=null, copEnCurs=null, palTriat=null;
+const forat=()=>String(cfg.forat);
+const H=()=>GEO[forat()], HP=()=>PC.holes[forat()];
+const origen=()=>jo||HP().tees[cfg.barra]||ll(H().tee);
+
+// distància a jugar d'un punt des d'on ets
+function aJugar(p){
+  const o=origen(),d=dist(o,p),zo=cota(o),zp=cota(p),dz=(zo!=null&&zp!=null)?zp-zo:0;
+  const w=componentsVent(ventAra(),rumb(o,p));
+  return{d,dz,j:d*fVent(w.al)+dz,tr:w.tr,al:w.al};
+}
+
+// ── mapa ──
+const mapa=L.map('mapa',{zoomControl:false,attributionControl:false,preferCanvas:true});
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19}).addTo(mapa);
+let capa=L.layerGroup().addTo(mapa), mJo=null, mObj=null, lObj=null;
+const et=(p,t,c)=>L.marker(p,{icon:L.divIcon({className:'q-et',html:`<span style="color:${c||'#fff'}">${t}</span>`,iconSize:[60,14],iconAnchor:[30,-6]}),interactive:false});
+mapa.on('click',e=>{
+  const p=[e.latlng.lat,e.latlng.lng];
+  if(ma){jo=p;precisio=null;pinta();return;}
+  if(copEnCurs&&copEnCurs.esperaMapa){acabaCop(p);return;}
+  objectiu=objectiu&&dist(objectiu,p)<4?null:p;pinta();
+});
+function dibuixaForat(centra){
+  capa.clearLayers();
+  const h=H(),hp=HP(),g=h.green;
+  if(hp.avant) L.polygon(hp.avant,{color:'#9bf28a',weight:1.5,fill:false,interactive:false}).addTo(capa);
+  if(g.contour) L.polygon(g.contour,{color:'#ffffff',weight:2,fillColor:'#00e676',fillOpacity:.15,interactive:false}).addTo(capa);
+  [['front','#fff'],['middle','#00e676'],['back','#fff']].forEach(([k,c])=>{if(g[k]) L.circleMarker(ll(g[k]),{radius:k==='middle'?5:3.5,color:'#000',weight:1,fillColor:c,fillOpacity:1,interactive:false}).addTo(capa);});
+  if(hp.collar) L.circleMarker(hp.collar,{radius:5,color:'#0b4d1c',weight:2,fillColor:'#b8f28c',fillOpacity:1,interactive:false}).addTo(capa);
+  if(hp.p70){L.circleMarker(hp.p70,{radius:4,color:'#fff',weight:1,fillColor:'#111',fillOpacity:1,interactive:false}).addTo(capa);et(hp.p70,'70').addTo(capa);}
+  (h.poi||[]).forEach(p=>['reach','carry'].forEach(k=>{if(p[k]) L.circleMarker(ll(p[k]),{radius:3,color:'#000',weight:1,
+    fillColor:p.type==='WATER'?'#4aa3ff':'#f2e6c9',fillOpacity:1,interactive:false}).addTo(capa);}));
+  Object.entries(hp.tees).forEach(([b,p])=>L.circleMarker(p,{radius:5,color:'#000',weight:1,
+    fillColor:{blanc:'#fff',groc:'#f2d32b',blau:'#1f5fbf',vermell:'#d62828'}[b],fillOpacity:1,interactive:false}).addTo(capa));
+  if(centra){const pts=[...Object.values(hp.tees),...(g.contour||[ll(g.middle)])];if(jo&&dist(jo,ll(g.middle))<600) pts.push(jo);
+    mapa.fitBounds(pts,{padding:[18,18],animate:false});}
+}
+function dibuixaJo(){
+  if(mJo){mapa.removeLayer(mJo);mJo=null;}
+  if(mObj){mapa.removeLayer(mObj);mObj=null;}
+  if(lObj){mapa.removeLayer(lObj);lObj=null;}
+  if(jo) mJo=L.circleMarker(jo,{radius:8,color:'#fff',weight:3,fillColor:'#2196f3',fillOpacity:1}).addTo(mapa);
+  if(objectiu){mObj=L.circleMarker(objectiu,{radius:7,color:'#fff',weight:2,fillColor:'#ff9800',fillOpacity:1}).addTo(mapa);
+    lObj=L.polyline([origen(),objectiu,ll(H().green.middle)],{color:'#ff9800',weight:2,dashArray:'6 5'}).addTo(mapa);}
+}
+
+// ── pintar ──
+const m=x=>Math.round(x);
+const signe=x=>(x>0?'+':x<0?'−':'')+Math.abs(Math.round(x));
+function pinta(centra){
+  const h=H(),hp=HP();
+  document.getElementById('titol').textContent=`Forat ${cfg.forat}`;
+  document.getElementById('subtitol').textContent=`Par ${hp.par} · Hcp ${hp.si} · ${hp.len[cfg.barra]} m`;
+  document.getElementById('ant').disabled=cfg.forat===1;document.getElementById('seg').disabled=cfg.forat===18;
+  document.querySelectorAll('[data-b]').forEach(b=>b.classList.toggle('on',b.dataset.b===cfg.barra));
+  document.getElementById('btn-ma').classList.toggle('on',ma);
+  const g=h.green, o=origen();
+  document.getElementById('gps').innerHTML=jo?(precisio!=null?`GPS ±${m(precisio)} m`:'Posició marcada a mà')
+    :`<span class="av">Sense posició: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`;
+  // green
+  [['f','front'],['c','middle'],['b','back']].forEach(([id,k])=>{
+    if(!g[k]){document.getElementById('d-'+id).textContent='–';document.getElementById('j-'+id).textContent='';return;}
+    const a=aJugar(ll(g[k]));
+    document.getElementById('d-'+id).textContent=m(a.d);
+    document.getElementById('j-'+id).textContent=Math.abs(a.j-a.d)>=1?`juga ${m(a.j)}`:'';
+  });
+  const c=aJugar(ll(g.middle));
+  document.getElementById('desn').textContent=Math.abs(c.dz)>=0.5?`Green ${c.dz>0?'per sobre':'per sota'}: ${signe(c.dz)} m`:'Green a nivell';
+  // pal
+  const r=recomana(c.j);
+  const deriva=Math.abs(c.tr)>=1?` · el vent la mou ~${m(Math.abs(c.tr)*c.d*0.012)} m cap a ${c.tr>0?'la dreta':"l'esquerra"}`:'';
+  document.getElementById('pal').innerHTML=r?`<div class="p">${nomPal(r.c)}</div><div class="t">Al centre del green juga <b>${m(c.j)} m</b>
+    (${m(c.d)} reals${Math.abs(c.dz)>=0.5?`, ${signe(c.dz)} m de desnivell`:''}).<br>${nomPal(r.c)} fa ${m(r.m)} m${r.alt?` · ${nomPal(r.alt)} fa ${m(r.altm)} m`:''}${deriva}</div>`
+    :'<div class="t">Sense dades dels pals</div>';
+  // vent
+  const w=ventAra();
+  document.getElementById('vent').innerHTML=(w?`💨 <b>${w.v.toFixed(1).replace('.',',')} m/s</b> del ${nomVent(w.d)}${w.r?` (ràfegues ${w.r.toFixed(0)})`:''} · ${w.font}`
+    +(Math.abs(c.al)>=0.5||Math.abs(c.tr)>=0.5?` · cap al green: ${c.al<0?'de cara':'a favor'} ${Math.abs(c.al).toFixed(1).replace('.',',')}, de través ${Math.abs(c.tr).toFixed(1).replace('.',',')}`:'')
+    :'💨 Sense dades de vent')+` <button class="bt" style="padding:4px 9px;margin-left:6px" onclick="obreVentMa()">${ventMa?'Canvia':'Posa\'l a mà'}</button>`;
+  // objectiu marcat
+  const ob=document.getElementById('objectiu');document.getElementById('obj-tit').style.display=objectiu?'':'none';
+  if(objectiu){const a=aJugar(objectiu),rr=recomana(a.j),dg=dist(objectiu,ll(g.middle));
+    ob.innerHTML=`<div><span class="n">Fins al punt</span><span class="v">${m(a.d)} m<small>juga ${m(a.j)} · ${rr?nomPal(rr.c):''}</small></span></div>
+      <div><span class="n">Del punt al centre del green</span><span class="v">${m(dg)} m</span></div>`;}
+  else ob.innerHTML='';
+  // obstacles i referències: només els que tens per davant
+  const files=[], cg=ll(g.middle), dGreen=dist(o,cg), rb=rumb(o,cg);
+  const davant=p=>{const dd=dist(o,p);return Math.cos((rumb(o,p)-rb)*rad)*dd>3;};
+  // costat respecte de la línia de joc (no de la recta fins al green: als doglegs enganyaria)
+  const xy=p=>[(p[1]-DEM.o[1])*DEM.k[0],(p[0]-DEM.o[0])*DEM.k[1]];
+  const cl=(h.centerLine||[]).map(q=>xy(ll(q)));cl[0]=xy(cg);
+  const costat=p=>{const P=xy(p);let best=null;
+    for(let i=0;i<cl.length-1;i++){const A=cl[i+1],B=cl[i],vx=B[0]-A[0],vy=B[1]-A[1],L2=vx*vx+vy*vy||1;
+      const t=Math.max(0,Math.min(1,((P[0]-A[0])*vx+(P[1]-A[1])*vy)/L2)),dx=P[0]-A[0]-t*vx,dy=P[1]-A[1]-t*vy,dd=dx*dx+dy*dy;
+      if(!best||dd<best[0]) best=[dd,vx*(P[1]-A[1])-vy*(P[0]-A[0])];}
+    return !best||Math.sqrt(best[0])<2?'':best[1]>0?' esquerra':' dreta';};
+  if(hp.collar&&davant(hp.collar)) files.push([dist(o,hp.collar),'Collarí (inici de l\'avantgreen)',aJugar(hp.collar)]);
+  if(hp.p70&&davant(hp.p70)) files.push([dist(o,hp.p70),'Punt de 70 m al centre del green',aJugar(hp.p70)]);
+  (h.poi||[]).forEach(p=>{
+    const nom=p.type==='WATER'?'Aigua':'Búnquer';
+    if(p.reach&&davant(ll(p.reach))){const a=aJugar(ll(p.reach));files.push([a.d,`${nom}${costat(ll(p.reach))}: hi arribes`,a]);}
+    if(p.carry&&davant(ll(p.carry))){const a=aJugar(ll(p.carry));files.push([a.d,`${nom}${costat(ll(p.carry))}: el passes`,a]);}
+  });
+  files.sort((a,b)=>a[0]-b[0]);
+  document.getElementById('obstacles').innerHTML=files.length?files.map(([d,n,a])=>
+    `<div><span class="n">${n}</span><span class="v">${m(d)} m${Math.abs(a.j-a.d)>=1?`<small>juga ${m(a.j)}</small>`:''}</span></div>`).join('')
+    :'<div><span class="n">Res per davant fins al green</span></div>';
+  pintaCop();pintaPals();dibuixaForat(centra);dibuixaJo();
+}
+
+// ── vent a mà ──
+function obreVentMa(){
+  const el=document.getElementById('vent-ma');
+  if(el.style.display!=='none'){el.style.display='none';return;}
+  const rb=rumb(origen(),ll(H().green.middle));
+  const dirs=[['Cara',0],['Cara-dreta',45],['Dreta',90],['Cua-dreta',135],['Cua',180],['Cua-esq.',225],['Esquerra',270],['Cara-esq.',315]];
+  el.innerHTML=`<div class="nota" style="width:100%;margin:0">D'on bufa respecte del green (mirant-lo des d'on ets):</div>`
+    +dirs.map(([n,a])=>`<button class="xip" onclick="ventDir(${(rb+a)%360})">${n}</button>`).join('')
+    +`<div class="nota" style="width:100%;margin:4px 0 0">Força:</div>`
+    +[0,2,4,6,8,10].map(v=>`<button class="xip${ventMa&&ventMa.v===v?' on':''}" onclick="ventForca(${v})">${v===0?'Calma':v+' m/s'}</button>`).join('')
+    +`<button class="bt" onclick="ventAuto()">Torna a la previsió</button>`;
+  el.style.display='flex';
+}
+function ventDir(d){ventMa={v:ventMa?ventMa.v:4,d};desa(CLAU_VENT,ventMa);pinta();obreVentMa();obreVentMa();}
+function ventForca(v){ventMa={v,d:ventMa?ventMa.d:(ventAra()||{d:0}).d};desa(CLAU_VENT,ventMa);pinta();obreVentMa();obreVentMa();}
+function ventAuto(){ventMa=null;desa(CLAU_VENT,null);document.getElementById('vent-ma').style.display='none';pinta();}
+
+// ── cops ──
+function pintaCop(){
+  const el=document.getElementById('cop'), ps=distPals();
+  if(copEnCurs&&copEnCurs.acabat){const k=copEnCurs;
+    el.innerHTML=`<div class="cop">${nomPal(k.pal)}: <b>${m(k.d)} m</b>${Math.abs(k.dz)>=0.5?`, ${signe(k.dz)} m de desnivell`:''}${Math.abs(k.al)>=0.5?`, vent ${k.al<0?'de cara':'a favor'} ${Math.abs(k.al).toFixed(1).replace('.',',')} m/s`:''}.
+      <br>En pla i sense vent serien <b>${m(k.eq)} m</b>.<div class="fila">Metres reals: <input id="cop-m" type="number" inputmode="numeric" value="${m(k.d)}">
+      <button class="bt verd" onclick="desaCop()">Desa</button><button class="bt" onclick="copEnCurs=null;pinta()">No el comptis</button></div></div>`;
+    return;}
+  if(copEnCurs){
+    el.innerHTML=`<div class="cop">Cop amb <b>${nomPal(copEnCurs.pal)}</b> des de ${copEnCurs.ma?'el punt marcat':'aquí'}. Quan arribis a la bola:
+      <div class="fila"><button class="bt gran verd" onclick="acabaCop()">📍 La bola és aquí</button>
+      <button class="bt${copEnCurs.esperaMapa?' on':''}" onclick="copEnCurs.esperaMapa=!copEnCurs.esperaMapa;pinta()">Toca al mapa</button>
+      <button class="bt vm" onclick="copEnCurs=null;pinta()">✕</button></div></div>`;
+    return;}
+  el.innerHTML=`<div class="fila">${ps.map(([c])=>`<button class="xip${palTriat===c?' on':''}" onclick="palTriat='${c}';pinta()">${nomPal(c)}</button>`).join('')}</div>
+    <div class="fila"><button class="bt gran verd" ${palTriat?'':'disabled'} onclick="comencaCop()">🏌️ Pego des d'aquí${palTriat?' amb '+nomPal(palTriat):''}</button></div>
+    <div class="fila"><span class="nota" style="margin:8px 4px 0 0">O escriu-ne els metres:</span><input id="cop-ma" type="number" inputmode="numeric" placeholder="m" style="width:80px;font:700 16px inherit;padding:6px;border-radius:8px;border:0">
+    <button class="bt" ${palTriat?'':'disabled'} onclick="copAMa()">Afegeix</button></div>`;
+}
+function comencaCop(){if(!palTriat) return;copEnCurs={pal:palTriat,ini:origen(),ma:!jo||ma,forat:cfg.forat,t:Date.now()};pinta();}
+function acabaCop(p){
+  const fi=p||jo;if(!fi){copEnCurs.esperaMapa=true;pinta();return;}
+  const k=copEnCurs,d=dist(k.ini,fi),zi=cota(k.ini),zf=cota(fi),dz=(zi!=null&&zf!=null)?zf-zi:0;
+  const w=componentsVent(ventAra(),rumb(k.ini,fi));
+  Object.assign(k,{fi,d,dz,al:w.al,eq:d*fVent(w.al)+dz,acabat:true,esperaMapa:false});pinta();
+}
+function desaCop(){
+  const k=copEnCurs,dm=+document.getElementById('cop-m').value;
+  if(dm>0&&Math.abs(dm-k.d)>=1){k.eq=k.eq*dm/k.d;k.d=dm;}
+  cops.push({t:k.t,forat:k.forat,pal:k.pal,d:Math.round(k.d),dz:+k.dz.toFixed(1),al:+k.al.toFixed(1),eq:Math.round(k.eq)});
+  desa(CLAU_COPS,cops);copEnCurs=null;pinta();
+}
+function copAMa(){
+  const d=+document.getElementById('cop-ma').value;if(!palTriat||!(d>0)) return;
+  cops.push({t:Date.now(),forat:cfg.forat,pal:palTriat,d,dz:0,al:0,eq:d,ma:1});desa(CLAU_COPS,cops);pinta();
+}
+function esborraCops(){if(confirm('Esborro els '+cops.length+' cops entrats aquí?')){cops=[];desa(CLAU_COPS,cops);pinta();}}
+function pintaPals(){
+  const ps=distPals();
+  document.getElementById('pals').innerHTML=`<tr><th>Pal</th><th>Historial</th><th>Aquí</th><th>Ara</th></tr>`
+    +ps.map(([c,i])=>`<tr><td><b>${nomPal(c)}</b></td><td>${m(i.hist)} <span class="nota">±${m(i.sd)} · ${i.nh}</span></td>
+      <td>${i.nc?m(i.cap)+' <span class="nota">· '+i.nc+'</span>':'–'}</td><td><b>${m(i.m)}</b></td></tr>`).join('');
+}
+
+// ── forat i posició ──
+function canviaForat(d){cfg.forat=Math.min(18,Math.max(1,cfg.forat+d));objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}
+function triaBarra(b){cfg.barra=b;desa(CLAU_CFG,cfg);pinta();}
+function modeMa(){ma=!ma;if(!ma&&precisio==null) jo=null;pinta();}
+// en arribar a un tee d'un altre forat, el caddie hi passa sol
+function foratPerTee(p){
+  for(const [n,hp] of Object.entries(PC.holes)) for(const t of Object.values(hp.tees)) if(dist(p,t)<12) return +n;
+  return null;
+}
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(pos=>{
+    if(ma) return;
+    jo=[pos.coords.latitude,pos.coords.longitude];precisio=pos.coords.accuracy;
+    const n=foratPerTee(jo);
+    if(n&&n!==cfg.forat&&!copEnCurs){cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}else pinta();
+  },()=>{document.getElementById('gps').innerHTML='<span class="av">Sense GPS: toca ✋ i marca on ets al mapa</span>';},
+  {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+}
+const q=new URLSearchParams(location.search);if(q.get('forat')){cfg.forat=Math.min(18,Math.max(1,+q.get('forat')));}
+pinta(true);carregaPrevisio();
+// la previsió es refà cada 30 min (i al cap de 20 s si la primera no ha arribat)
+setTimeout(()=>{if(!previsio) carregaPrevisio();},20000);setInterval(carregaPrevisio,30*60e3);
+</script>
+</body>
+</html>

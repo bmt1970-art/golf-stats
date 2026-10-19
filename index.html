@@ -285,6 +285,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button id="btn-hide-all" class="gps-tool-btn" onclick="toggleHideAllShots()">✕ Cops</button>
     <button id="btn-relleu" class="gps-tool-btn" onclick="toggleRelleu()" style="display:none">⛳ Pendents</button>
     <button id="btn-putt" class="gps-tool-btn" onclick="togglePutt()" style="display:none">🎯 Putt</button>
+    <button id="btn-caddie" class="gps-tool-btn" onclick="location.href='caddie.html?forat='+gpsHole" style="display:none">🧢 Caddie</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
@@ -1247,6 +1248,7 @@ function renderGPSHole(n){
   document.getElementById('btn-relleu').style.display=relleu?'':'none';
   const superf=superficieForat(n);
   document.getElementById('btn-putt').style.display=superf?'':'none';
+  document.getElementById('btn-caddie').style.display=curCourse.name==='Panoramica Golf'?'':'none';
   document.getElementById('putt-panel').style.display=(puttOn&&superf)?'':'none';
   if(gpsRelleu&&relleu){
     const s=relleu.stats;
