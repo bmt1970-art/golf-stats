@@ -88,15 +88,6 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <div class="pal" id="pal"></div>
   <h3>Cops d'aquest forat <button class="bt" style="float:right;padding:4px 9px;margin-top:-6px" onclick="enviaClaude()">💬 Envia a Claude</button></h3>
   <div id="cop"></div>
-  <div class="cop" style="margin-top:8px">🚩 Bandera: <span id="band-txt"></span>
-    <div class="fila" id="zones-xips"></div>
-    <div class="fila"><button class="bt" id="bt-posa" onclick="posaBanderaMa()">📍 Posa-la al mapa</button></div>
-    <div id="avis-zona"></div>
-    <div style="height:6px"></div>🎯 Làser a bandera:
-    <input id="laser" type="number" inputmode="decimal" placeholder="m" style="width:84px">
-    <button class="bt" onclick="laser()">Calcula</button>
-    <button class="bt" onclick="treuBandera()" id="bt-treu" style="display:none">✕</button>
-    <div class="llista" id="laser-res"></div></div>
   <div class="vent" id="vent">Vent: carregant…</div>
   <div class="fila" id="vent-ma" style="display:none"></div>
 
@@ -110,6 +101,16 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <h3>Els teus pals</h3>
   <table class="taula" id="pals"></table>
 
+  <h3>Bandera</h3>
+  <div class="cop" style="margin-top:8px">🚩 Bandera: <span id="band-txt"></span>
+    <div class="fila" id="zones-xips"></div>
+    <div class="fila"><button class="bt" id="bt-posa" onclick="posaBanderaMa()">📍 Posa-la al mapa</button></div>
+    <div id="avis-zona"></div>
+    <div style="height:6px"></div>🎯 Làser a bandera:
+    <input id="laser" type="number" inputmode="decimal" placeholder="m" style="width:84px">
+    <button class="bt" onclick="laser()">Calcula</button>
+    <button class="bt" onclick="treuBandera()" id="bt-treu" style="display:none">✕</button>
+    <div class="llista" id="laser-res"></div></div>
   <h3>Opcions</h3>
   <div class="fila">
     <span class="nota" style="margin:8px 4px 0 0">Barres:</span>
