@@ -556,6 +556,13 @@ async function exportaRonda(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
 }
+// on s'acaba el forat: la bandera (posició exacta, marcada al mapa, làser o centre de la zona del dia) si n'hi ha;
+// si no s'ha marcat res, el centre del green
+function desti(n){const b=banderaDe(n);
+  return b?{p:b.p,bandera:true,nom:'a la bandera'}:{p:ll(GEO[n].green.middle),bandera:false,nom:'al centre del green'};}
+// el cop següent des d'un punt: distància, la que juga (desnivell i vent des d'aquell punt) i el pal
+function segon(o,p){const d=dist(o,p),zo=cota(o),zp=cota(p),dz=(zo!=null&&zp!=null)?zp-zo:0,w=componentsVent(ventAra(),rumb(o,p)),j=d*fVent(w.al)+dz;
+  return{d,j,r:recomana(j)};}
 // «deixa-la a X m»: el punt de la línia de joc a X m de la bandera (o del centre del green), el pal i el risc
 let deixa=null;
 function triaDeixa(x){deixa=deixa===x?null:x;pinta();}
@@ -622,10 +629,12 @@ function dibuixaJo(){
   const b=banderaDe(cfg.forat);
   if(b) mBand=L.marker(b.p,{icon:L.divIcon({className:'q-et',html:'<span style="font-size:20px">⛳</span>',iconSize:[24,24],iconAnchor:[6,22]}),interactive:false}).addTo(mapa);
   if(objectiu){mObj=L.circleMarker(objectiu,{radius:7,color:'#fff',weight:2,fillColor:'#ff9800',fillOpacity:1}).addTo(mapa);
-    lObj=L.polyline([origen(),objectiu,ll(H().green.middle)],{color:'#ff9800',weight:2,dashArray:'6 5'}).addTo(mapa);
+    const ds=desti(cfg.forat);
+    lObj=L.polyline([origen(),objectiu,ds.p],{color:'#ff9800',weight:2,dashArray:'6 5'}).addTo(mapa);
     // al costat del punt: distància, la que juga, el pal i el que queda fins al centre del green
-    const a=aJugar(objectiu),cs=consell(origen(),objectiu,a.j),rr=cs&&cs.r,dg=dist(objectiu,ll(H().green.middle));
-    mObj.bindTooltip(`<b>${m(a.d)} m</b>${Math.abs(a.j-a.d)>=1?` · juga ${m(a.j)}`:''}${rr?` · <b>${nomPal(rr.c)}</b>`:''}<br><span style="font-size:11px">queden ${m(dg)} m al green${cs?' · '+txtRisc(cs.r0):''}</span>`,
+    const a=aJugar(objectiu),cs=consell(origen(),objectiu,a.j),rr=cs&&cs.r,s2=segon(objectiu,ds.p);
+    mObj.bindTooltip(`<b>${m(a.d)} m</b>${Math.abs(a.j-a.d)>=1?` · juga ${m(a.j)}`:''}${rr?` · <b>${nomPal(rr.c)}</b>`:''}${cs?' · '+txtRisc(cs.r0):''}`
+      +`<br><span style="font-size:11px">després ${m(s2.d)} m ${ds.nom}${Math.abs(s2.j-s2.d)>=1?` (juga ${m(s2.j)})`:''}${s2.r?' · '+nomPal(s2.r.c):''}</span>`,
       {permanent:true,direction:'top',offset:[0,-8],className:'tt-obj'}).openTooltip();}
 }
 
@@ -675,10 +684,10 @@ function pinta(centra){
     :'💨 Sense dades de vent')+` <button class="bt" style="padding:4px 9px;margin-left:6px" onclick="obreVentMa()">${ventMa?'Canvia':'Posa\'l a mà'}</button>`;
   // objectiu marcat
   const ob=document.getElementById('objectiu');document.getElementById('obj-tit').style.display=objectiu?'':'none';
-  if(objectiu){const a=aJugar(objectiu),rr=recomana(a.j),dg=dist(objectiu,ll(g.middle));
+  if(objectiu){const a=aJugar(objectiu),rr=recomana(a.j),ds=desti(cfg.forat),s2=segon(objectiu,ds.p);
     ob.innerHTML=`<div><span class="n">Fins al punt</span><span class="v">${m(a.d)} m<small>juga ${m(a.j)} · ${rr?nomPal(rr.c):''}</small></span></div>
-      <div><span class="n">Del punt al centre del green</span><span class="v">${m(dg)} m</span></div>`
-      +(cota(objectiu)!=null?`<div><span class="n">El green respecte del punt</span><span class="v">${signe(cota(ll(g.middle))-cota(objectiu))} m</span></div>`:'');}
+      <div><span class="n">Del punt ${ds.nom}</span><span class="v">${m(s2.d)} m<small>juga ${m(s2.j)}${s2.r?' · '+nomPal(s2.r.c):''}</small></span></div>`
+      +(cota(objectiu)!=null&&cota(ds.p)!=null?`<div><span class="n">${ds.bandera?'La bandera':'El green'} respecte del punt</span><span class="v">${signe(cota(ds.p)-cota(objectiu))} m</span></div>`:'');}
   else ob.innerHTML='';
   // obstacles i referències: només els que tens per davant
   const files=[], cg=ll(g.middle), dGreen=dist(o,cg), rb=rumb(o,cg);
