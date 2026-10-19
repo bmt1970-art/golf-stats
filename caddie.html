@@ -102,6 +102,8 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
     <div class="caixa band"><div class="et" id="e-z">Bandera</div><div class="m" id="d-z">–</div><div class="j" id="j-z"></div>
       <div id="pal"></div></div>
   </div>
+  <div class="cop" style="margin-top:8px">🎯 <b>Deixa-la a</b>
+    <span id="deixa-xips"></span><div class="llista" id="deixa-res"></div></div>
   <h3>Cops d'aquest forat <button class="bt" style="float:right;padding:4px 9px;margin-top:-6px" onclick="enviaClaude()">💬 Envia a Claude</button></h3>
   <div id="cop"></div>
   <div class="vent" id="vent">Vent: carregant…</div>
@@ -216,7 +218,7 @@ const nomVent=d=>BRUIXOLA[Math.round(d/45)%8];
 const NOMS={DRIVER:'D',WOOD_3:'3W',WOOD_5:'5W',WOOD_7:'7W',HYBRID_3:'3H',HYBRID_4:'4H',HYBRID_5:'5H',IRON_3:'3I',IRON_4:'4I',
   IRON_5:'5I',IRON_6:'6I',IRON_7:'7I',IRON_8:'8I',IRON_9:'9I',WEDGE_PITCHING:'PW',WEDGE_UTILITY:'UW',WEDGE_GAP:'GW',
   WEDGE_SAND:'SW',WEDGE_LOB:'LW'};
-const nomPal=c=>NOMS[c]||{SAND:'Sand',PUTT:'Putt',PUTT_FR:'Putt (fringe)',PENALTY:'Penalty'}[c]||c;
+const nomPal=c=>NOMS[c]||{SAND:'Sand',ROUGH:'Rough',CHIP:'Chip',PUTT:'Putt',PUTT_FR:'Putt (fringe)',PENALTY:'Penalty'}[c]||c;
 const HIST=(()=>{
   const st={},ara=new Date();
   Object.values(GPS_DATA).forEach(rs=>Object.values(rs).forEach(rd=>{
@@ -252,6 +254,38 @@ function recomana(dJugar){
   const alt=dJugar>b[1].m?ps[idx-1]:ps[idx+1];
   return{c:b[0],m:b[1].m,alt:alt?alt[0]:null,altm:alt?alt[1].m:null};
 }
+
+// ── risc: dispersió de cada pal (longitud: la ± de l'historial; lateral: un 7 % de la distància) ──
+const OBS=(()=>{const o=PC.obst||{b:[],a:[]},caixa=pol=>{let s=90,n=-90,w=180,e=-180;pol.forEach(([a,b])=>{s=Math.min(s,a);n=Math.max(n,a);w=Math.min(w,b);e=Math.max(e,b);});return[s,n,w,e];};
+  return{b:o.b.map(p=>({p,c:caixa(p)})),a:o.a.map(p=>({p,c:caixa(p)})),aprox:o.font_a!=='dxf'};})();
+function risc(o,pal,obj){
+  // on apunta: cap a l'objectiu, amb la distància que fa el pal (llargada a jugar convertida a metres reals)
+  const ps=Object.fromEntries(distPals()),i=ps[pal];if(!i) return null;
+  const rb=rumb(o,obj),dObj=dist(o,obj),a=aJugar(obj),k=dObj/Math.max(1,a.j);      // metres reals per metre jugat
+  const dReal=i.m*k,sdL=Math.max(4,i.sd||8)*k,sdT=Math.max(3,0.07*dReal);
+  const deriva=a.tr*dReal*0.012;                                                       // el vent de través la desvia
+  const ctr=puntA(o,dReal,rb),dE=[Math.sin(rb*rad),Math.cos(rb*rad)],dN=[Math.cos(rb*rad),-Math.sin(rb*rad)];
+  const pr=(lat,lon,obs)=>obs.filter(x=>lat>=x.c[0]&&lat<=x.c[1]&&lon>=x.c[2]&&lon<=x.c[3]).some(x=>dinsPol([lat,lon],x.p));
+  let nb=0,na=0;const N=500;let sd=12345;const rnd=()=>{sd=(sd*16807)%2147483647;return sd/2147483647;};
+  for(let t=0;t<N;t++){
+    const g1=Math.sqrt(-2*Math.log(rnd()+1e-12))*Math.cos(2*Math.PI*rnd()),g2=Math.sqrt(-2*Math.log(rnd()+1e-12))*Math.cos(2*Math.PI*rnd());
+    const al=g1*sdL,tr=g2*sdT+deriva;                                                  // metres al llarg i de través
+    const lat=ctr[0]+(al*Math.cos(rb*rad)-tr*Math.sin(rb*rad))/DEM.k[1],lon=ctr[1]+(al*Math.sin(rb*rad)+tr*Math.cos(rb*rad))/DEM.k[0];
+    if(pr(lat,lon,OBS.a)) na++; else if(pr(lat,lon,OBS.b)) nb++;
+  }
+  return{pal,b:nb/N,a:na/N,d:dReal,centre:ctr,sdL,sdT,deriva,rb};
+}
+// el pal recomanat amb el risc, i l'alternativa si és clarament més segura
+function consell(o,obj,jObj){
+  const r=recomana(jObj);if(!r) return null;
+  const r0=risc(o,r.c,obj),cand=[r.c,r.alt].filter(Boolean).map(c=>risc(o,c,obj)).filter(Boolean);
+  const tot=x=>x.a*2+x.b;                                                              // l'aigua pesa el doble
+  const millor=cand.reduce((x,y)=>tot(y)<tot(x)-0.08?y:x,r0);
+  return{r,r0,millor};
+}
+const pct=x=>Math.round(100*x)+' %';
+function txtRisc(x){if(!x) return '';const t=[];if(x.b>=0.05) t.push(`${pct(x.b)} búnquer`);if(x.a>=0.03) t.push(`${pct(x.a)} aigua`);
+  return t.length?`⚠️ ${t.join(' · ')}`:'✅ sense perill';}
 
 // ── estat ──
 let cfg=llegeix(CLAU_CFG,{forat:1,barra:'groc'});
@@ -450,6 +484,25 @@ async function exportaRonda(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
 }
+// «deixa-la a X m»: el punt de la línia de joc a X m de la bandera (o del centre del green), el pal i el risc
+let deixa=null;
+function triaDeixa(x){deixa=deixa===x?null:x;pinta();}
+function puntDeixa(n,x){
+  const h=GEO[n],b=banderaDe(n),ref=b?b.p:ll(h.green.middle),o=origen();
+  const cl=(h.centerLine||[]).map(ll);cl[0]=ll(h.green.middle);
+  // es recorre la línia de joc des del green cap al tee i s'agafa el primer punt a X m de la referència
+  for(let i=0;i<cl.length-1;i++){const a=cl[i],c=cl[i+1];
+    for(let t=0;t<=1;t+=0.01){const q=[a[0]+(c[0]-a[0])*t,a[1]+(c[1]-a[1])*t];if(dist(q,ref)>=x) return dist(q,o)<dist(ref,o)?q:null;}}
+  return null;
+}
+function pintaDeixa(){
+  document.getElementById('deixa-xips').innerHTML=[50,70,90,110,130].map(x=>`<button class="xip${deixa===x?' on':''}" onclick="triaDeixa(${x})">${x}</button>`).join('');
+  const el=document.getElementById('deixa-res');if(!deixa){el.innerHTML='';return;}
+  const q=puntDeixa(cfg.forat,deixa);if(!q){el.innerHTML=`<div><span class="n">Ja ets a menys de ${deixa} m</span></div>`;return;}
+  const o=origen(),a=aJugar(q),cs=consell(o,q,a.j);
+  el.innerHTML=`<div><span class="n">Cop de ${m(a.d)} m (juga ${m(a.j)})</span><span class="v">${cs?nomPal(cs.r.c):'–'}<small>${cs?txtRisc(cs.r0):''}</small></span></div>`
+    +(cs&&cs.millor&&cs.millor.pal!==cs.r.c?`<div><span class="n">Més segur</span><span class="v">${nomPal(cs.millor.pal)}<small>${txtRisc(cs.millor)}</small></span></div>`:'');
+}
 function treuBandera(){delete bandera[cfg.forat];if(banderesDia.man[cfg.forat]){delete banderesDia.man[cfg.forat];desaBand();}document.getElementById('laser').value='';pinta();}
 function pintaLaser(){
   const zs=banderesDia.man[cfg.forat]?null:zonaDe(cfg.forat),hz=HP().zones,pd=posicioDe(cfg.forat);
@@ -473,7 +526,21 @@ function pintaLaser(){
     +(dzc!=null?`<div><span class="n">Bandera respecte del centre del green</span><span class="v">${signe(dzc*100)} cm</span></div>`:'')
     +(b.dins?'':'<div><span class="n av">No cau dins del green: comprova la lectura</span></div>');
 }
+let capaRisc=null;
+function elipse(x){const pts=[];for(let a=0;a<=360;a+=12){const al=2*Math.cos(a*rad)*x.sdL,tr=2*Math.sin(a*rad)*x.sdT+x.deriva;   // 2 desviacions: hi cau el 86 % dels cops
+  pts.push([x.centre[0]+(al*Math.cos(x.rb*rad)-tr*Math.sin(x.rb*rad))/DEM.k[1],x.centre[1]+(al*Math.sin(x.rb*rad)+tr*Math.cos(x.rb*rad))/DEM.k[0]]);}return pts;}
+function dibuixaRisc(){
+  if(capaRisc){mapa.removeLayer(capaRisc);capaRisc=null;}
+  capaRisc=L.layerGroup().addTo(mapa);
+  const o=origen(),h=H(),b=banderaDe(cfg.forat),obj=objectiu||(deixa&&puntDeixa(cfg.forat,deixa))||(b?b.p:ll(h.green.middle));
+  const a=aJugar(obj),cs=consell(o,obj,a.j);if(!cs||!cs.r0) return;
+  const x=cs.r0,dolent=x.a>=0.03||x.b>=0.05;
+  L.polygon(elipse(x),{color:dolent?'#ff8a75':'#8fe388',weight:2,fillOpacity:.18,interactive:false}).addTo(capaRisc);
+  if(deixa){const q=puntDeixa(cfg.forat,deixa);if(q){L.circleMarker(q,{radius:6,color:'#fff',weight:2,fillColor:'#4fc3f7',fillOpacity:1,interactive:false}).addTo(capaRisc);
+    et(q,deixa+' m','#4fc3f7').addTo(capaRisc);}}
+}
 function dibuixaJo(){
+  dibuixaRisc();
   if(mJo){mapa.removeLayer(mJo);mJo=null;}
   if(mObj){mapa.removeLayer(mObj);mObj=null;}
   if(lObj){mapa.removeLayer(lObj);lObj=null;}
@@ -484,8 +551,8 @@ function dibuixaJo(){
   if(objectiu){mObj=L.circleMarker(objectiu,{radius:7,color:'#fff',weight:2,fillColor:'#ff9800',fillOpacity:1}).addTo(mapa);
     lObj=L.polyline([origen(),objectiu,ll(H().green.middle)],{color:'#ff9800',weight:2,dashArray:'6 5'}).addTo(mapa);
     // al costat del punt: distància, la que juga, el pal i el que queda fins al centre del green
-    const a=aJugar(objectiu),rr=recomana(a.j),dg=dist(objectiu,ll(H().green.middle));
-    mObj.bindTooltip(`<b>${m(a.d)} m</b>${Math.abs(a.j-a.d)>=1?` · juga ${m(a.j)}`:''}${rr?` · <b>${nomPal(rr.c)}</b>`:''}<br><span style="font-size:11px">queden ${m(dg)} m al green</span>`,
+    const a=aJugar(objectiu),cs=consell(origen(),objectiu,a.j),rr=cs&&cs.r,dg=dist(objectiu,ll(H().green.middle));
+    mObj.bindTooltip(`<b>${m(a.d)} m</b>${Math.abs(a.j-a.d)>=1?` · juga ${m(a.j)}`:''}${rr?` · <b>${nomPal(rr.c)}</b>`:''}<br><span style="font-size:11px">queden ${m(dg)} m al green${cs?' · '+txtRisc(cs.r0):''}</span>`,
       {permanent:true,direction:'top',offset:[0,-8],className:'tt-obj'}).openTooltip();}
 }
 
@@ -522,9 +589,11 @@ function pinta(centra){
   document.getElementById('desn').textContent=Math.abs(c.dz)>=0.5?`Green ${c.dz>0?'per sobre':'per sota'}: ${signe(c.dz)} m`:'Green a nivell';
   // pal: cap a la bandera si se sap on és; si no, cap al centre del green
   const obj=bz?aJugar(bz.p):c, jObj=bz?(bz.laser&&dist(o,bz.o)<=5?bz.D:obj.d)*fVent(obj.al)+obj.dz:c.j;
-  const r=recomana(jObj);
+  const cs=consell(o,bz?bz.p:ll(g.middle),jObj),r=cs&&cs.r;
   const deriva=Math.abs(obj.tr)>=1?` · vent: ~${m(Math.abs(obj.tr)*obj.d*0.012)} m cap a ${obj.tr>0?'la dreta':"l'esquerra"}`:'';
   document.getElementById('pal').innerHTML=r?`<div class="p">${nomPal(r.c)}</div><div class="t">${nomPal(r.c)} fa ${m(r.m)}${r.alt?` · ${nomPal(r.alt)} ${m(r.altm)}`:''}${deriva}</div>`
+    +`<div class="t" style="color:${cs.r0&&(cs.r0.a>=0.03||cs.r0.b>=0.05)?'#ffb4a6':'#8fe388'}">${txtRisc(cs.r0)}</div>`
+    +(cs.millor&&cs.millor.pal!==r.c?`<div class="t" style="color:#f4d35e">Més segur: ${nomPal(cs.millor.pal)} (${txtRisc(cs.millor).replace(/^\S+ /,'')})</div>`:'')
     :'<div class="t">Sense dades dels pals</div>';
   // vent
   const w=ventAra();
@@ -560,7 +629,7 @@ function pinta(centra){
   document.getElementById('obstacles').innerHTML=files.length?files.map(([d,n,a])=>
     `<div><span class="n">${n}</span><span class="v">${m(d)} m${Math.abs(a.j-a.d)>=1?`<small>juga ${m(a.j)}</small>`:''}</span></div>`).join('')
     :'<div><span class="n">Res per davant fins al green</span></div>';
-  pintaCop();pintaPals();pintaLaser();dibuixaForat(centra);dibuixaJo();if(centra) dibuixaDesn();
+  pintaCop();pintaPals();pintaLaser();pintaDeixa();dibuixaForat(centra);dibuixaJo();if(centra) dibuixaDesn();
 }
 
 // ── vent a mà ──
@@ -584,8 +653,8 @@ function ventAuto(){ventMa=null;desa(CLAU_VENT,null);document.getElementById('ve
 // La posició del cop és la del GPS (o la marcada amb ✋). El cop següent, o la bola al green, en tanca la distància;
 // amb el desnivell i el vent del moment, en surt l'equivalent en pla i sense vent, que ajusta la distància del pal.
 const CLAU_RONDA='pano-caddie-rondes';
-// cada forat: la llista de cops en ordre, com al Golf Pad. Cada cop és un pal, Sand (des del búnquer), Putt, Putt des
-// del collarí (fringe) o Penalty; tots compten un cop. «Guardar» tanca el forat i passa al següent.
+// cada forat: la llista de cops en ordre, com al Golf Pad. Cada cop és un pal, Sand (des del búnquer), Rough, Chip,
+// Putt o Penalty; tots compten un cop. Només els cops de pal ajusten la distància del pal. «Guardar» tanca el forat i passa al següent.
 let rondes=llegeix(CLAU_RONDA,{});                    // {data: {forat: {cops:[{pal,p,t,w,no,si,dm}], tancat}}}
 const rondaAvui=()=>(rondes[avui()]=rondes[avui()]||{});
 const foratR=n=>(rondaAvui()[n]=rondaAvui()[n]||{cops:[],tancat:false});
@@ -647,8 +716,8 @@ function pintaCop(){
   el.innerHTML=(ks.length?`<div class="llista">${ks.map(fila).join('')}</div>`:'<div class="nota" style="margin:0 0 4px">A cada bola, toca el pal amb què jugues des d\'allà: es desa la posició.</div>')
     +(f.tancat?'<div class="nota">✅ Forat guardat.</div>':'')
     +`<div class="fila">${ps.map(([c])=>`<button class="xip" onclick="pega('${c}')">${nomPal(c)}</button>`).join('')}</div>
-    <div class="fila"><button class="xip" onclick="pega('SAND')">Sand</button><button class="xip" onclick="pega('PUTT')">Putt</button>
-      <button class="xip" onclick="pega('PUTT_FR')">Putt (fringe)</button><button class="xip" onclick="pega('PENALTY')">Penalty</button>
+    <div class="fila"><button class="xip" onclick="pega('SAND')">Sand</button><button class="xip" onclick="pega('ROUGH')">Rough</button>
+      <button class="xip" onclick="pega('CHIP')">Chip</button><button class="xip" onclick="pega('PUTT')">Putt</button><button class="xip" onclick="pega('PENALTY')">Penalty</button>
       <button class="xip" onclick="desfes()">↩ Desfer</button><button class="xip" style="background:#2e7d32" onclick="guardaForat()">💾 Guardar</button></div>
     <div class="fila"><span class="nota" style="margin:8px 4px 0 0">Cop sense GPS: pal i metres</span>
       <select id="cop-pal" style="font:600 16px inherit;padding:6px;border-radius:8px">${ps.map(([c])=>`<option value="${c}">${nomPal(c)}</option>`).join('')}</select>
