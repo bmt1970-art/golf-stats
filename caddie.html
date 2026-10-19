@@ -68,10 +68,12 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <button class="ico" id="ant" onclick="canviaForat(-1)">◀</button>
   <div class="forat"><b id="titol">Forat 1</b><small id="subtitol"></small></div>
   <button class="ico" id="seg" onclick="canviaForat(1)">▶</button>
+  <button class="ico" onclick="obrePutt()" title="Putt al green d'aquest forat">🎯</button>
   <button class="ico" id="btn-desn" onclick="toggleDesn()" title="Desnivell respecte del centre del green">⛰️</button>
   <button class="ico" id="btn-ma" onclick="modeMa()" title="Situa't tocant el mapa">✋</button>
 </div>
 <div id="mapa"></div>
+<iframe id="putt" title="Putt" style="display:none;position:fixed;inset:0;width:100%;height:100%;border:0;z-index:5000;background:#0e2a14"></iframe>
 <div id="llegenda" style="display:none;font-size:11px;color:var(--sub);padding:4px 10px;background:var(--pan)"></div>
 <div class="baix">
   <div class="estat"><span id="gps">Buscant GPS…</span><span id="desn"></span></div>
@@ -470,6 +472,16 @@ async function desaPlanol(){
     bt.textContent=err?`Desat amb ${err} errors: torna-ho a provar`:'✅ Plànol desat al mòbil';
   }catch(e){bt.textContent='Sense connexió: torna-ho a provar amb cobertura';}
 }
+
+// ── putt: l'app de putt a pantalla completa, amb el green del forat i la bandera del làser si n'hi ha ──
+function obrePutt(){
+  const b=bandera[cfg.forat],f=document.getElementById('putt');
+  f.src=`putt.html?dins=1&camp=${encodeURIComponent(CAMP)}&forat=${cfg.forat}`+(b&&b.dins?`&bandera=${b.p[0].toFixed(7)},${b.p[1].toFixed(7)}`:'');
+  f.style.display='block';
+}
+window.addEventListener('message',e=>{
+  if(e.origin===location.origin&&e.data&&e.data.putt==='tanca'){const f=document.getElementById('putt');f.style.display='none';f.src='about:blank';}
+});
 
 // ── forat i posició ──
 function canviaForat(d){cfg.forat=Math.min(18,Math.max(1,cfg.forat+d));objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}

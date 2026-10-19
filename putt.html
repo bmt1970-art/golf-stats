@@ -447,6 +447,12 @@ function novaPos(pos){
            joCercle=L.circle(posJo,{radius:posJo.acc,color:'#1e88ff',weight:1,fillOpacity:.12,interactive:false}).addTo(mapa); }
   else { jo.setLatLng(posJo); joCercle.setLatLng(posJo).setRadius(posJo.acc); }
   const m=mesProper(posJo);
+  if(primer&&actual){      // obert des del caddie amb el green triat: la bola, on ets si ets al green
+    amagaInici();
+    const p=estatDe(actual),S=puttSuperficie(actual.camp,actual.n);
+    if(!p.fixada&&S&&puttDins(S,...puttEN(S,posJo))){p.bola=posJo.slice();p.gps=posJo.acc;p.exemple=false;dibuixaPutt();}
+    return;
+  }
   if(primer){              // sempre la llista de camps (ordenada per distancia), encara que siguis al green
     amagaInici();
     if(!actual) obreTria(m&&m.d<A_PROP?`Ets al ${grupDe(m.g.camp)}.`:m?`El green més proper és a ${fM(m.d)}.`:'');
@@ -507,7 +513,9 @@ function obreTria(sub,grup){
 }
 function tancaTria(){ document.getElementById('tria').style.display='none'; }
 // una pagina web no es pot tancar sola: es torna a l'app principal (a pantalla completa no hi ha barra del navegador)
-function surt(){ location.href='index.html'; }
+const PARAM=new URLSearchParams(location.search);
+const DINS=PARAM.get('dins')==='1';          // oberta dins del caddie: «‹» el tanca en lloc d'anar a l'app principal
+function surt(){ if(DINS&&window.parent!==window) window.parent.postMessage({putt:'tanca'},location.origin); else location.href='index.html'; }
 function triat(clau){ tancaTria(); obre(GREENS.find(g=>g.clau===clau),false); }
 
 // ── calibratge: registre de putts de prova (es desa al mobil; s'envia en CSV) ──
@@ -631,11 +639,20 @@ stimp(0);
 document.getElementById('b-fletxes').classList.toggle('on',fletxes);
 document.getElementById('b-banderes').classList.toggle('on',banderes);
 document.getElementById('b-quadricula').classList.toggle('on',quadricula);
+// green demanat per la URL (des del caddie), i la bandera si la porta (la del làser)
+(()=>{
+  const g=GREENS.find(x=>x.camp===PARAM.get('camp')&&String(x.n)===PARAM.get('forat'));
+  if(!g) return;
+  const b=(PARAM.get('bandera')||'').split(',').map(Number);
+  if(b.length===2&&b.every(isFinite)) estatDe(g).forat=b;
+  amagaInici(); obre(g,false);
+})();
+if(DINS) document.querySelectorAll('[onclick="surt()"]').forEach(b=>{b.title='Torna al caddie';if(b.textContent.includes('Surt')) b.textContent='Torna al caddie';});
 if(!GREENS.length){ amagaInici(); document.getElementById('apunta').textContent='No hi ha cap green amb relleu.'; }
 else if(!navigator.geolocation){ sensePos('Aquest mòbil no dona la posició.'); }
 else {
   navigator.geolocation.watchPosition(novaPos,
-    e=>{ if(!posJo) sensePos(e.code===1?'No has donat permís per a la posició: tria el green a mà.':'No s\'ha pogut obtenir la posició: tria el green a mà.'); },
+    e=>{ if(!posJo&&!actual) sensePos(e.code===1?'No has donat permís per a la posició: tria el green a mà.':'No s\'ha pogut obtenir la posició: tria el green a mà.'); },
     {enableHighAccuracy:true,maximumAge:2000,timeout:20000});
   setTimeout(()=>{ if(!posJo&&document.getElementById('inici').style.display!=='none') document.getElementById('inici-txt').textContent='Continua buscant… Si triga, pots triar el green a mà.'; },8000);
   document.getElementById('inici').onclick=()=>{ if(!posJo) sensePos('Encara no tinc la posició: tria el green.'); };
