@@ -113,7 +113,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   </div>
   <div class="fila">
     <button class="bt" id="bt-planol" onclick="desaPlanol()">📥 Desa el plànol al mòbil</button>
-    <button class="bt" onclick="location.href='putt.html'">🎯 Putt</button>
+    <button class="bt" onclick="obrePutt()">🎯 Putt</button>
     <button class="bt" onclick="esborraCops()">Esborra els cops del cap de setmana</button>
   </div>
   <p class="nota">«A jugar» és la distància corregida pel desnivell (1 m de pujada ≈ 1 m més) i pel vent
@@ -474,9 +474,18 @@ async function desaPlanol(){
 }
 
 // ── putt: l'app de putt a pantalla completa, amb el green del forat i la bandera del làser si n'hi ha ──
+// el green on ets: si ets a menys de 40 m del centre d'un green, aquest; si no, el del forat que mostra el caddie
+function foratDelGreen(){
+  if(!jo) return cfg.forat;
+  let millor=null;
+  Object.entries(GEO).forEach(([n,h])=>{const d=dist(jo,ll(h.green.middle));if(d<40&&(!millor||d<millor[1])) millor=[+n,d];});
+  return millor?millor[0]:cfg.forat;
+}
 function obrePutt(){
-  const b=bandera[cfg.forat],f=document.getElementById('putt');
-  f.src=`putt.html?dins=1&camp=${encodeURIComponent(CAMP)}&forat=${cfg.forat}`+(b&&b.dins?`&bandera=${b.p[0].toFixed(7)},${b.p[1].toFixed(7)}`:'');
+  const n=foratDelGreen();
+  if(n!==cfg.forat){cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}
+  const b=bandera[n],f=document.getElementById('putt');
+  f.src=`putt.html?dins=1&camp=${encodeURIComponent(CAMP)}&forat=${n}`+(b&&b.dins?`&bandera=${b.p[0].toFixed(7)},${b.p[1].toFixed(7)}`:'');
   f.style.display='block';
 }
 window.addEventListener('message',e=>{
