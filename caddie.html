@@ -256,7 +256,9 @@ let cfg=llegeix(CLAU_CFG,{forat:1,barra:'groc'});
 let jo=null, precisio=null, ma=false, objectiu=null;
 const forat=()=>String(cfg.forat);
 const H=()=>GEO[forat()], HP=()=>PC.holes[forat()];
-const origen=()=>jo||HP().tees[cfg.barra]||ll(H().tee);
+// lluny del camp (a més d'1,5 km del green del forat), les distàncies es donen des de les barres i no des d'on ets
+const aprop=()=>jo&&dist(jo,ll(H().green.middle))<1500;
+const origen=()=>(aprop()?jo:null)||HP().tees[cfg.barra]||ll(H().tee);
 
 // distància a jugar d'un punt des d'on ets
 function aJugar(p){
@@ -493,7 +495,8 @@ function pinta(centra){
   document.querySelectorAll('[data-b]').forEach(b=>b.classList.toggle('on',b.dataset.b===cfg.barra));
   document.getElementById('btn-ma').classList.toggle('on',ma);
   const g=h.green, o=origen();
-  document.getElementById('gps').innerHTML=jo?(precisio!=null?`GPS ±${m(precisio)} m`:'Posició marcada a mà')
+  document.getElementById('gps').innerHTML=jo&&!aprop()?`<span class="av">Ets lluny del camp: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`
+    :jo?(precisio!=null?`GPS ±${m(precisio)} m`:'Posició marcada a mà')
     :`<span class="av">Sense posició: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`;
   // green
   [['f','front'],['c','middle'],['b','back']].forEach(([id,k])=>{
