@@ -71,6 +71,8 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
 .nota{color:var(--sub);font-size:11px;margin-top:10px;line-height:1.4}
 .q-et{color:#fff;font:700 11px/13px system-ui,sans-serif;text-align:center;text-shadow:0 0 3px #000,0 0 2px #000;pointer-events:none;white-space:nowrap}
 .leaflet-container{background:#1d3b22}
+.tt-obj{background:rgba(14,30,18,.92);color:#fff;border:1px solid #ff9800;border-radius:8px;font:600 13px -apple-system,system-ui,sans-serif;padding:4px 8px}
+.tt-obj:before{border-top-color:#ff9800}
 </style>
 </head>
 <body>
@@ -480,7 +482,11 @@ function dibuixaJo(){
   const b=banderaDe(cfg.forat);
   if(b) mBand=L.marker(b.p,{icon:L.divIcon({className:'q-et',html:'<span style="font-size:20px">⛳</span>',iconSize:[24,24],iconAnchor:[6,22]}),interactive:false}).addTo(mapa);
   if(objectiu){mObj=L.circleMarker(objectiu,{radius:7,color:'#fff',weight:2,fillColor:'#ff9800',fillOpacity:1}).addTo(mapa);
-    lObj=L.polyline([origen(),objectiu,ll(H().green.middle)],{color:'#ff9800',weight:2,dashArray:'6 5'}).addTo(mapa);}
+    lObj=L.polyline([origen(),objectiu,ll(H().green.middle)],{color:'#ff9800',weight:2,dashArray:'6 5'}).addTo(mapa);
+    // al costat del punt: distància, la que juga, el pal i el que queda fins al centre del green
+    const a=aJugar(objectiu),rr=recomana(a.j),dg=dist(objectiu,ll(H().green.middle));
+    mObj.bindTooltip(`<b>${m(a.d)} m</b>${Math.abs(a.j-a.d)>=1?` · juga ${m(a.j)}`:''}${rr?` · <b>${nomPal(rr.c)}</b>`:''}<br><span style="font-size:11px">queden ${m(dg)} m al green</span>`,
+      {permanent:true,direction:'top',offset:[0,-8],className:'tt-obj'}).openTooltip();}
 }
 
 // ── pintar ──
