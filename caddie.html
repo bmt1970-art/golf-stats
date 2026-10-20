@@ -172,14 +172,10 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   de 3 a 5 m.</p>
 </div>
 
+<script src="caddie_camps.js"></script>
 <script>
-// camps amb caddie: es tria amb ?camp=gaudi (sense paràmetre, el Panorámica, com sempre). El Panorámica conserva les
-// claus de localStorage sense prefix, la memòria de rajoles i l'exportació d'abans; cada camp nou hi posa el seu prefix
-const CAMPS={
-  panoramica:{nom:'Panoramica Golf',titol:'Panorámica Golf',curt:'Panorámica',dades:'pano_caddie.js',v:()=>PANO_CADDIE,
-    rajoles:'rajoles',bounds:[[40.54355,0.355],[40.55607,0.37971]],cau:'pano-rajoles-v1',clau:'',tipus:'caddie-panoramica',fitxer:'ronda_panoramica'},
-  gaudi:{nom:'Golf Reus Aiguesverds',titol:'Gaudí Reus Golf',curt:'Gaudí',dades:'gaudi_caddie.js',v:()=>GAUDI_CADDIE,
-    rajoles:'rajoles_gaudi',cau:'gaudi-rajoles-v1',clau:'gaudi-',tipus:'caddie-gaudi',fitxer:'ronda_gaudi'}};
+// camp: es tria amb ?camp=<clau> de caddie_camps.js (sense paràmetre, el Panorámica, com sempre)
+const CAMPS=CADDIE_CAMPS;
 const CAMP_ID=(c=>CAMPS[c]?c:'panoramica')(new URLSearchParams(location.search).get('camp'));
 const CC=CAMPS[CAMP_ID];
 document.title='Caddie '+CC.curt;

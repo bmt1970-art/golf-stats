@@ -1,5 +1,9 @@
 const CACHE = 'golf-stats-v115';
-const FILES = ['./index.html', './caddie.html', './putt.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './gaudi_caddie.js', './manifest.json', './putt.webmanifest'];
+// camps amb caddie (caddie_camps.js): les seves dades van a la memòria, i les rajoles i la seva memòria es tracten a part
+importScripts('./caddie_camps.js');
+const CADDIES = Object.values(CADDIE_CAMPS);
+const FILES = ['./index.html', './caddie.html', './putt.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './caddie_camps.js', './manifest.json', './putt.webmanifest']
+  .concat(CADDIES.map(c => './' + c.dades));
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -7,7 +11,7 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE && !k.startsWith('pano-rajoles') && !k.startsWith('gaudi-rajoles')).map(k => caches.delete(k)))
+    Promise.all(keys.filter(k => k !== CACHE && !CADDIES.some(c => c.cau === k)).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
@@ -26,8 +30,8 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-  // plànol del Panoramica i del Gaudi (rajoles de l'ortofoto): primer la memoria que el caddie hi ha desat
-  if ((url.pathname.includes('/rajoles/') || url.pathname.includes('/rajoles_gaudi/')) && url.pathname.endsWith('.webp')) {
+  // plànol de cada camp amb caddie (rajoles de l'ortofoto): primer la memoria que el caddie hi ha desat
+  if (url.pathname.endsWith('.webp') && CADDIES.some(c => url.pathname.includes('/' + c.rajoles + '/'))) {
     e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(r => r || fetch(e.request)));
     return;
   }

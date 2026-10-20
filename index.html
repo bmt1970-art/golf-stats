@@ -233,14 +233,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
         <span class="bi">⛳</span>
         <div class="bt"><b>Putt</b><span>Línia i força al green on ets</span></div>
       </button>
-      <button class="hbtn caddie" onclick="location.href='caddie.html'">
-        <span class="bi">🧢</span>
-        <div class="bt"><b>Caddie Panorámica</b><span>Distàncies, vent, desnivell i pal</span></div>
-      </button>
-      <button class="hbtn caddie" onclick="location.href='caddie.html?camp=gaudi'">
-        <span class="bi">🧢</span>
-        <div class="bt"><b>Caddie Gaudí</b><span>Distàncies, vent, desnivell i pal</span></div>
-      </button>
+      <span id="botons-caddie" style="display:contents"></span>
       <button class="hbtn clubs" onclick="openClubs()">
         <span class="bi">📏</span>
         <div class="bt"><b>Distàncies</b><span>Estadístiques per pal</span></div>
@@ -395,6 +388,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
 <script src="flag_history.js"></script>
 <script src="putt_motor.js"></script>
 <script src="clubs.js"></script>
+<script src="caddie_camps.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let curCourse=null, curHole=1, curType=null, statsType=null;
@@ -683,8 +677,11 @@ let gpsMap=null, gpsHole=1, gpsCourseData=null;
 let gpsTrajectoryLayers=[], gpsSelMarker=null;
 let gpsShotsGroup=null, gpsSelectedRounds=new Set();
 let gpsWatchId=null, gpsMyMarker=null;
-// camps amb caddie (nom del camp → paràmetre camp de caddie.html); el Panorámica, sense paràmetre, com abans
-const CAMPS_CADDIE={'Panoramica Golf':'panoramica','Golf Reus Aiguesverds':'gaudi'};
+// camps amb caddie (caddie_camps.js): nom del camp → paràmetre camp de caddie.html; el Panorámica, sense paràmetre
+const CAMPS_CADDIE=Object.fromEntries(Object.entries(CADDIE_CAMPS).map(([k,c])=>[c.nom,k]));
+document.getElementById('botons-caddie').innerHTML=Object.entries(CADDIE_CAMPS).map(([k,c])=>
+  `<button class="hbtn caddie" onclick="location.href='caddie.html${k==='panoramica'?'':'?camp='+k}'"><span class="bi">🧢</span>`+
+  `<div class="bt"><b>Caddie ${c.curt}</b><span>Distàncies, vent, desnivell i pal</span></div></button>`).join('');
 function obreCaddie(){const c=CAMPS_CADDIE[curCourse.name];
   location.href='caddie.html?'+(c&&c!=='panoramica'?'camp='+c+'&':'')+'forat='+gpsHole;}
 let gpsClubMode=false, gpsClubMarker=null, gpsClubLine=null;
