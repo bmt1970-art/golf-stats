@@ -629,6 +629,7 @@ function pintaLaser(){
   av.innerHTML=zl&&zs&&zl!==zs?`<div class="nota" style="color:#ffb4a6;font-size:13px">El làser la situa a la zona ${zl}, no a la ${zs}. L'han canviada?</div>
     <div class="fila"><button class="bt" onclick="canviZona(${zl},false)">Només aquest forat</button>
     <button class="bt" onclick="canviZona(${zl},true)">Posició ${zl} des d'aquest forat</button></div>`
+    :bl&&bl.ajust&&hz?'<div class="nota">Direcció ajustada: amb el làser no puc saber en quina zona és.</div>'
     :zl===null&&bl&&bl.dins&&hz?'<div class="nota">El làser la situa fora de les zones de la targeta.</div>':'';
   const b=banderaDe(cfg.forat),el=document.getElementById('laser-res');document.getElementById('bt-treu').style.display=bandera[cfg.forat]||banderesDia.man[cfg.forat]?'':'none';
   if(!b){el.innerHTML='';return;}
@@ -807,10 +808,12 @@ function totsCops(){
     Object.entries(ro).forEach(([n,f])=>copsDe(f).forEach(k=>{if(compta(k)) r.push({t:k.t,forat:+n,pal:k.pal,d:k.d,dz:k.dz,al:k.al,eq:k.eq});}));});
   return r;
 }
-function pega(pal){
+function pega(pal,ambPos){
+  // mentre es busca la posició d'un cop, un altre toc no desa res (es desaria amb la posició d'abans)
+  if(pega.pendent){document.getElementById('gps').textContent=`Encara busco la posició del cop amb ${nomPal(pega.pendent)}…`;return;}
   // en estalvi (o si la darrera lectura del GPS té més d'un minut) primer es demana la posició; si no arriba, el cop no es desa
-  if(!ma&&pal!=='PENALTY'&&!pega.fet&&(estalvi||(jo&&precisio!=null&&Date.now()-joT>60e3))){pega.fet=true;
-    posicioAra(()=>{pega(pal);pega.fet=false;},()=>{pega.fet=false;
+  if(!ambPos&&!ma&&pal!=='PENALTY'&&(estalvi||(jo&&precisio!=null&&Date.now()-joT>60e3))){pega.pendent=pal;
+    posicioAra(()=>{pega.pendent=null;pega(pal,true);},()=>{pega.pendent=null;
       alert(`No tinc la posició: el cop amb ${nomPal(pal)} no s'ha desat.
 Torna a tocar el pal quan respongui el GPS, o toca ✋, marca on ets al mapa i torna a tocar el pal.`);});
     return;}
