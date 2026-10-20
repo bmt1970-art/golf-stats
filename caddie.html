@@ -472,6 +472,14 @@ function tallsGreen(n,P,D){
   return ts.sort((x,y)=>x-y);
 }
 const mou=(P,D,t)=>[P[0]+D[1]*t/DEM.k[1],P[1]+D[0]*t/DEM.k[0]];
+// dins del contorn del green, o a menys de «marge» metres de la vora
+function dinsGreen(n,p,marge){
+  const c=GEO[n].green.contour;if(!c) return true;if(dinsPol(p,c)) return true;
+  const xy=q=>[(q[1]-p[1])*DEM.k[0],(q[0]-p[0])*DEM.k[1]],C=c.map(xy);let dm=Infinity;
+  for(let i=0,j=C.length-1;i<C.length;j=i++){const a=C[j],b=C[i],ex=b[0]-a[0],ey=b[1]-a[1],L2=ex*ex+ey*ey||1;
+    const t=Math.max(0,Math.min(1,-(a[0]*ex+a[1]*ey)/L2));dm=Math.min(dm,Math.hypot(a[0]+t*ex,a[1]+t*ey));}
+  return dm<=(marge||0);
+}
 function puntFull(n,x){
   const h=GEO[n];if(!h.green.contour) return null;
   const G=ll(h.green.middle),cl=(h.centerLine||[]).map(ll);cl[0]=G;
@@ -481,7 +489,7 @@ function puntFull(n,x){
   const ts=tallsGreen(n,G,D);if(ts.length<2) return null;
   const P=mou(G,D,ts[0]+x.fons);                                                     // xx m des de l'entrada
   const E=[-D[1],D[0]];                                                               // cap a l'esquerra
-  const tl=tallsGreen(n,P,E);if(tl.length<2) return P;
+  const tl=tallsGreen(n,P,E);if(tl.length<2) return null;                            // xx m passa del green
   const tE=tl[tl.length-1],tD=tl[0];                                                  // vora esquerra i vora dreta
   return mou(P,E,x.costat==='L'?tE-x.lat:tD+x.lat);
 }
@@ -496,6 +504,9 @@ function desaFullBanderes(){
   const ex={},mal=[];
   document.querySelectorAll('#full-band-camps input').forEach(el=>{const v=el.value.trim();if(!v) return;const x=llegeixPos(v);if(x) ex[el.dataset.f]=x;else mal.push(el.dataset.f);});
   if(mal.length){document.getElementById('full-band-err').textContent='No entenc el forat '+mal.join(', ')+': escriu-ho com 22/5R o 22/5L.';return;}
+  // cada posició ha de caure dins del green (amb 1 m de marge per la vora del contorn)
+  const fora=Object.entries(ex).filter(([n,x])=>{const p=puntFull(n,x);return !p||!dinsGreen(n,p,1);}).map(([n,x])=>`${n} (${textPos(x)})`);
+  if(fora.length){document.getElementById('full-band-err').textContent=(fora.length>1?'Als forats '+fora.slice(0,-1).join(', ')+' i '+fora[fora.length-1]+' la bandera cau':'Al forat '+fora[0]+' la bandera cau')+' fora del green: revisa els metres o deixa-ho buit.';return;}
   banderesDia.exacta=ex;desaBand();tancaFullBanderes();pinta(true);
 }
 function esborraFullBanderes(){banderesDia.exacta={};desaBand();obreFullBanderes();pinta();}
@@ -526,7 +537,7 @@ function banderaDe(n){
       font:'làser'+(ajust?', direcció '+ajust+' (la '+(ref?(man?'de la marca':ref.exacta?'de '+ref.font:'de la zona '+z):'del centre')+' queia fora)'
         :ref?', direcció '+(man?'de la marca':ref.exacta?'de '+ref.font:'de la zona '+z):', direcció del centre')};
   }
-  return ref?{...ref,dins:true}:null;
+  return ref?{...ref,dins:ref.exacta?dinsGreen(n,ref.p,1):true}:null;
 }
 // la ronda en text, per passar-la a Claude (l'app del mòbil) i analitzar-la o actualitzar el caddie
 function textRonda(){
@@ -578,7 +589,7 @@ async function exportaRonda(){
   const rond={};
   Object.entries(rondes).forEach(([data,ro])=>{rond[data]={};
     Object.entries(ro).forEach(([n,f])=>{if(!f.cops.length&&f.putts==null) return;
-      rond[data][n]={par:PC.holes[n].par,guardat:!!f.tancat,total:copsForat(n),cops:copsDe(f).map(k=>({
+      rond[data][n]={par:PC.holes[n].par,guardat:!!f.tancat,total:copsForat(n,data),cops:copsDe(f).map(k=>({
         pal:k.pal,t:new Date(k.t).toISOString(),p:k.p,fi:k.fi||null,d:k.d!=null?Math.round(k.d):null,dm:k.dm||null,
         dz:k.dz!=null?+k.dz.toFixed(2):null,vent:k.w||null,vent_al:k.al!=null?+k.al.toFixed(2):null,eq:k.eq!=null?Math.round(k.eq):null,
         compta:compta(k),no:!!k.no,si:!!k.si}))};});});
@@ -842,7 +853,7 @@ function noCompta(i){const f=foratR(cfg.forat),k=f.cops[i],ara=compta(copsDe(f)[
 function metresCop(i){const f=foratR(cfg.forat),k=copsDe(f)[i];if(k.d==null) return;
   const v=prompt(`Metres reals del cop amb ${nomPal(k.pal)} (el GPS en diu ${m(k.d)}):`,m(k.d));
   if(v&&+v>0){f.cops[i].dm=+v;desaRonda();pinta();}}
-const copsForat=n=>{const f=(rondes[avui()]||{})[n];return f?f.cops.length+(f.putts||0)+(f.pen||0):0;};
+const copsForat=(n,data=avui())=>{const f=(rondes[data]||{})[n];return f?f.cops.length+(f.putts||0)+(f.pen||0):0;};
 function pintaCop(){
   const el=document.getElementById('cop'),f=(rondes[avui()]||{})[cfg.forat]||{cops:[]},ks=copsDe(f),ps=distPals();
   const mans=cops.map((k,i)=>[k,i]).filter(([k])=>k.forat===cfg.forat&&diaLocal(k.t)===avui());
