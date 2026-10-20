@@ -237,6 +237,10 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
         <span class="bi">🧢</span>
         <div class="bt"><b>Caddie Panorámica</b><span>Distàncies, vent, desnivell i pal</span></div>
       </button>
+      <button class="hbtn caddie" onclick="location.href='caddie.html?camp=gaudi'">
+        <span class="bi">🧢</span>
+        <div class="bt"><b>Caddie Gaudí</b><span>Distàncies, vent, desnivell i pal</span></div>
+      </button>
       <button class="hbtn clubs" onclick="openClubs()">
         <span class="bi">📏</span>
         <div class="bt"><b>Distàncies</b><span>Estadístiques per pal</span></div>
@@ -290,7 +294,7 @@ table.sc tr:nth-child(even) .lbl{background:#3a5e3a}
     <button id="btn-hide-all" class="gps-tool-btn" onclick="toggleHideAllShots()">✕ Cops</button>
     <button id="btn-relleu" class="gps-tool-btn" onclick="toggleRelleu()" style="display:none">⛳ Pendents</button>
     <button id="btn-putt" class="gps-tool-btn" onclick="togglePutt()" style="display:none">🎯 Putt</button>
-    <button id="btn-caddie" class="gps-tool-btn" onclick="location.href='caddie.html?forat='+gpsHole" style="display:none">🧢 Caddie</button>
+    <button id="btn-caddie" class="gps-tool-btn" onclick="obreCaddie()" style="display:none">🧢 Caddie</button>
   </div>
   <div class="gps-filter" id="gps-filter"></div>
   <div id="gps-map"></div>
@@ -679,6 +683,10 @@ let gpsMap=null, gpsHole=1, gpsCourseData=null;
 let gpsTrajectoryLayers=[], gpsSelMarker=null;
 let gpsShotsGroup=null, gpsSelectedRounds=new Set();
 let gpsWatchId=null, gpsMyMarker=null;
+// camps amb caddie (nom del camp → paràmetre camp de caddie.html); el Panorámica, sense paràmetre, com abans
+const CAMPS_CADDIE={'Panoramica Golf':'panoramica','Golf Reus Aiguesverds':'gaudi'};
+function obreCaddie(){const c=CAMPS_CADDIE[curCourse.name];
+  location.href='caddie.html?'+(c&&c!=='panoramica'?'camp='+c+'&':'')+'forat='+gpsHole;}
 let gpsClubMode=false, gpsClubMarker=null, gpsClubLine=null;
 let gpsHidePutts=false, gpsHideWedges=false, gpsHideIrons=false;
 let gpsHideAllShots=false;
@@ -1253,7 +1261,7 @@ function renderGPSHole(n){
   document.getElementById('btn-relleu').style.display=relleu?'':'none';
   const superf=superficieForat(n);
   document.getElementById('btn-putt').style.display=superf?'':'none';
-  document.getElementById('btn-caddie').style.display=curCourse.name==='Panoramica Golf'?'':'none';
+  document.getElementById('btn-caddie').style.display=CAMPS_CADDIE[curCourse.name]?'':'none';
   document.getElementById('putt-panel').style.display=(puttOn&&superf)?'':'none';
   if(gpsRelleu&&relleu){
     const s=relleu.stats;

@@ -1,5 +1,5 @@
-const CACHE = 'golf-stats-v114';
-const FILES = ['./index.html', './caddie.html', './putt.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './manifest.json', './putt.webmanifest'];
+const CACHE = 'golf-stats-v115';
+const FILES = ['./index.html', './caddie.html', './putt.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './gaudi_caddie.js', './manifest.json', './putt.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -7,7 +7,7 @@ self.addEventListener('install', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE && !k.startsWith('pano-rajoles')).map(k => caches.delete(k)))
+    Promise.all(keys.filter(k => k !== CACHE && !k.startsWith('pano-rajoles') && !k.startsWith('gaudi-rajoles')).map(k => caches.delete(k)))
   ));
   self.clients.claim();
 });
@@ -26,8 +26,8 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-  // plànol del Panoramica (rajoles de l'ortofoto): primer la memoria que el caddie hi ha desat
-  if (url.pathname.includes('/rajoles/') && url.pathname.endsWith('.webp')) {
+  // plànol del Panoramica i del Gaudi (rajoles de l'ortofoto): primer la memoria que el caddie hi ha desat
+  if ((url.pathname.includes('/rajoles/') || url.pathname.includes('/rajoles_gaudi/')) && url.pathname.endsWith('.webp')) {
     e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(r => r || fetch(e.request)));
     return;
   }

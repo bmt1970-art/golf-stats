@@ -165,24 +165,42 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <div class="nota" id="url-claude-estat" style="margin-top:2px"></div>
   <div class="fila"><button class="bt" onclick="actualitza()">🔄 Força actualització</button><span class="nota" id="versio" style="margin:8px 0 0 4px"></span></div>
   <p class="nota">«A jugar» és la distància corregida pel desnivell (1 m de pujada ≈ 1 m més) i pel vent
-  (de cara, +2,2 % per m/s; de cua, −1,1 % per m/s). El desnivell surt del LiDAR del PNOA (2023) i el vent,
+  (de cara, +2,2 % per m/s; de cua, −1,1 % per m/s). El desnivell surt <span id="font-desn">del LiDAR del PNOA (2023)</span> i el vent,
   d'Open-Meteo a 10 m d'alçada, si no el poses a mà. Les distàncies dels pals són les de les teves partides
   de Golf Pad dels dos últims anys (mitjana sense el 15 % de cada extrem, cop sencer amb el rodolament) i
   s'ajusten amb els cops que entris aquí, que només es guarden en aquest mòbil. El GPS del mòbil té un error
   de 3 a 5 m.</p>
 </div>
 
+<script>
+// camps amb caddie: es tria amb ?camp=gaudi (sense paràmetre, el Panorámica, com sempre). El Panorámica conserva les
+// claus de localStorage sense prefix, la memòria de rajoles i l'exportació d'abans; cada camp nou hi posa el seu prefix
+const CAMPS={
+  panoramica:{nom:'Panoramica Golf',titol:'Panorámica Golf',curt:'Panorámica',dades:'pano_caddie.js',v:()=>PANO_CADDIE,
+    rajoles:'rajoles',bounds:[[40.54355,0.355],[40.55607,0.37971]],cau:'pano-rajoles-v1',clau:'',tipus:'caddie-panoramica',fitxer:'ronda_panoramica'},
+  gaudi:{nom:'Golf Reus Aiguesverds',titol:'Gaudí Reus Golf',curt:'Gaudí',dades:'gaudi_caddie.js',v:()=>GAUDI_CADDIE,
+    rajoles:'rajoles_gaudi',cau:'gaudi-rajoles-v1',clau:'gaudi-',tipus:'caddie-gaudi',fitxer:'ronda_gaudi'}};
+const CAMP_ID=(c=>CAMPS[c]?c:'panoramica')(new URLSearchParams(location.search).get('camp'));
+const CC=CAMPS[CAMP_ID];
+document.title='Caddie '+CC.curt;
+// només les dades del camp triat, carregades abans del codi del caddie
+document.write(`<script src="${CC.dades}"><\/script>`);
+</script>
 <script src="course_geo.js"></script>
 <script src="gps_all.js"></script>
-<script src="pano_caddie.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script>
 'use strict';
-const CAMP='Panoramica Golf';
+const CAMP=CC.nom;
 const GEO=COURSE_GEO[CAMP];
-const PC=PANO_CADDIE;
-const CLAU_COPS='pano-caddie-cops', CLAU_VENT='pano-caddie-vent', CLAU_PREV='pano-caddie-previsio', CLAU_CFG='pano-caddie-cfg';
+const PC=(()=>{try{return CC.v();}catch(e){return null;}})();
+// sense les dades del caddie d'aquest camp (encara no generades), un avís i prou
+if(!PC||!GEO){document.body.innerHTML=`<div class="baix"><p>Encara no hi ha les dades del caddie del ${CC.titol}.</p>
+  <button class="bt" onclick="location.href='index.html'">‹ Torna a Golf Stats</button></div>`;throw new Error('Sense dades del caddie: '+CC.dades);}
+// claus de localStorage i sessionStorage: les del Panorámica, sense prefix; les dels altres camps, amb el seu
+const K=k=>CC.clau+k;
+const CLAU_COPS=K('pano-caddie-cops'), CLAU_VENT=K('pano-caddie-vent'), CLAU_PREV=K('pano-caddie-previsio'), CLAU_CFG=K('pano-caddie-cfg');
 const llegeix=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}};
 const desa=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
 
@@ -332,11 +350,12 @@ const GIR=typeof L.Map.prototype.setBearing==='function';
 const mapa=L.map('mapa',{zoomControl:false,attributionControl:false,preferCanvas:true,zoomSnap:0.25,
   rotate:GIR,bearing:0,touchRotate:false,rotateControl:GIR?{closeOnZeroBearing:false,position:'topleft'}:false});
 mapa.setView(ll(GEO['1'].green.middle),16);      // amb el mapa girat, fitBounds necessita una vista inicial
-const RAJOLES={bounds:[[40.54355,0.355],[40.55607,0.37971]]};
+// carpeta i límits de les rajoles: els de les dades del camp (rajoles:{dir,bounds}) si n'hi ha; si no, els del registre
+const RAJOLES={dir:CC.rajoles,bounds:(PC.rajoles&&PC.rajoles.bounds)||CC.bounds};
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19}).addTo(mapa);
 // ortofoto PNOA 2024 del camp (rajoles pròpies, es poden desar al mòbil per jugar sense cobertura)
-L.tileLayer('rajoles/{z}/{x}/{y}.webp',{minZoom:15,maxNativeZoom:19,maxZoom:20,bounds:RAJOLES.bounds,errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACw='}).addTo(mapa);
-L.control.attribution({prefix:false,position:'bottomright'}).addAttribution('PNOA © IGN').addTo(mapa);
+L.tileLayer(RAJOLES.dir+'/{z}/{x}/{y}.webp',{minZoom:15,maxNativeZoom:19,maxZoom:20,bounds:RAJOLES.bounds,errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACw='}).addTo(mapa);
+L.control.attribution({prefix:false,position:'bottomright'}).addAttribution((PC.rajoles&&PC.rajoles.atribucio)||'PNOA © IGN').addTo(mapa);
 let capa=L.layerGroup().addTo(mapa), mJo=null, mObj=null, lObj=null;
 const et=(p,t,c)=>L.marker(p,{icon:L.divIcon({className:'q-et',html:`<span style="color:${c||'#fff'}">${t}</span>`,iconSize:[60,14],iconAnchor:[30,-6]}),interactive:false});
 mapa.on('click',e=>{
@@ -420,15 +439,17 @@ function laser(){
 // o la bandera posada a mà al mapa si no és a cap zona
 // el dia és el del rellotge del mòbil (no el d'UTC, que a la una de la matinada encara és el dia anterior)
 const diaLocal=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-const CLAU_BAND='pano-caddie-banderes-v2', avui=()=>diaLocal(Date.now());
+const CLAU_BAND=K('pano-caddie-banderes-v2'), avui=()=>diaLocal(Date.now());
+// la posició del dia (1-6) només té sentit si el camp té les zones de la targeta dibuixades
+const TE_ZONES=Object.values(PC.holes).some(h=>h.zones);
 let banderesDia=llegeix(CLAU_BAND,{data:null,pos:null,canvis:[],z:{},man:{}});
 if(banderesDia.data!==avui()) banderesDia={data:null,pos:null,canvis:[],z:{},man:{}};
 // si la pàgina queda oberta d'un dia a l'altre, en tornar-hi les banderes i el làser d'ahir ja no valen
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='visible'||!banderesDia.data||banderesDia.data===avui()) return;
   banderesDia={data:null,pos:null,canvis:[],z:{},man:{}};Object.keys(bandera).forEach(n=>delete bandera[n]);
-  try{sessionStorage.removeItem('pano-band-ara-no');}catch(e){}
-  obreBanderes();pinta();});
+  try{sessionStorage.removeItem(K('pano-band-ara-no'));}catch(e){}
+  if(TE_ZONES) obreBanderes();pinta();});
 const desaBand=()=>{banderesDia.data=avui();desa(CLAU_BAND,banderesDia);};
 // la posició vigent en un forat: la del dia, o la del darrer canvi fet en aquell forat o abans
 function posicioDe(n){let p=banderesDia.pos;(banderesDia.canvis||[]).forEach(c=>{if(n>=c.des) p=c.pos;});return p;}
@@ -440,7 +461,7 @@ function zonaDelPunt(n,p){const zs=PC.holes[n].zones||{};for(const [z,pol] of Ob
 function triaZona(z){delete banderesDia.man[cfg.forat];
   if(z===posicioDe(cfg.forat)) delete banderesDia.z[cfg.forat]; else banderesDia.z[cfg.forat]=z;desaBand();pinta();}
 function obreBanderes(){const el=document.getElementById('banderes-dia');el.style.display='';el.scrollIntoView({block:'nearest'});}
-function amagaBanderes(){document.getElementById('banderes-dia').style.display='none';try{sessionStorage.setItem('pano-band-ara-no','1');}catch(e){}}
+function amagaBanderes(){document.getElementById('banderes-dia').style.display='none';try{sessionStorage.setItem(K('pano-band-ara-no'),'1');}catch(e){}}
 // la posició general (i els canvis a mitja ronda) es tria de nou; el que s'ha vist forat per forat es conserva:
 // el full de banderes, les marcades al mapa i les zones d'un sol forat (menys les que ara ja coincideixen amb la general)
 function desaPosicio(z){
@@ -541,7 +562,7 @@ function banderaDe(n){
 }
 // la ronda en text, per passar-la a Claude (l'app del mòbil) i analitzar-la o actualitzar el caddie
 function textRonda(){
-  const L=[`Ronda al Panorámica Golf, ${new Date().toLocaleString('ca-ES')}. Barres ${cfg.barra}.`];
+  const L=[`Ronda al ${CC.titol}, ${new Date().toLocaleString('ca-ES')}. Barres ${cfg.barra}.`];
   const w=ventAra();if(w) L.push(`Vent: ${w.v.toFixed(1)} m/s del ${nomVent(w.d)} (${w.font}).`);
   if(banderesDia.data===avui()){
     L.push(`Posició de bandera del dia: ${banderesDia.pos||'no la sé'}`+((banderesDia.canvis||[]).length?'; canvis: '+banderesDia.canvis.map(c=>`des del forat ${c.des}, posició ${c.pos}`).join(', '):''));
@@ -561,11 +582,11 @@ function textRonda(){
 }
 async function comparteix(){
   const text=textRonda();
-  try{if(navigator.share){await navigator.share({title:'Ronda al Panorámica',text});return;}}catch(e){if(e.name==='AbortError') return;}
+  try{if(navigator.share){await navigator.share({title:'Ronda al '+CC.curt,text});return;}}catch(e){if(e.name==='AbortError') return;}
   try{await navigator.clipboard.writeText(text);alert('Copiat: enganxa-ho a Claude.');}catch(e){prompt('Copia aquest text i enganxa\'l a Claude:',text);}
 }
 // «Envia a Claude»: copia la ronda i obre la sessió de Claude Code (Control remot); allà s'enganxa i s'envia
-const CLAU_URL='pano-caddie-claude-url';
+const CLAU_URL=K('pano-caddie-claude-url');
 const urlClaude=()=>{try{return localStorage.getItem(CLAU_URL)||'';}catch(e){return '';}};
 function desaUrlClaude(){
   const v=document.getElementById('url-claude').value.trim();
@@ -574,7 +595,7 @@ function desaUrlClaude(){
   pintaUrlClaude();
 }
 function pintaUrlClaude(){const u=urlClaude();document.getElementById('url-claude').value=u;
-  document.getElementById('url-claude-estat').textContent=u?'Desat.':"Enganxa-hi l'enllaç de la sessió «Caddie Panorámica en directe».";}
+  document.getElementById('url-claude-estat').textContent=u?'Desat.':`Enganxa-hi l'enllaç de la sessió «Caddie ${CC.curt} en directe».`;}
 async function enviaClaude(){
   const u=urlClaude();
   if(!u){alert("Primer desa l'enllaç de la sessió de Claude a Opcions.");document.getElementById('url-claude').scrollIntoView({block:'center'});return;}
@@ -593,12 +614,12 @@ async function exportaRonda(){
         pal:k.pal,t:new Date(k.t).toISOString(),p:k.p,fi:k.fi||null,d:k.d!=null?Math.round(k.d):null,dm:k.dm||null,
         dz:k.dz!=null?+k.dz.toFixed(2):null,vent:k.w||null,vent_al:k.al!=null?+k.al.toFixed(2):null,eq:k.eq!=null?Math.round(k.eq):null,
         compta:compta(k),no:!!k.no,si:!!k.si}))};});});
-  const dades={tipus:'caddie-panoramica',versio:1,exportat:new Date().toISOString(),camp:CAMP,barra:cfg.barra,
+  const dades={tipus:CC.tipus,versio:1,exportat:new Date().toISOString(),camp:CAMP,barra:cfg.barra,
     banderes:banderesDia,laser:Object.fromEntries(Object.keys(bandera).map(n=>{const b=banderaDe(+n);return[n,{D:b.D,o:b.o,p:b.p,dins:b.dins}];})),
     rondes:rond,cops_a_ma:cops,pals:Object.fromEntries(distPals().map(([c,i])=>[c,{historial:Math.round(i.hist),n_hist:i.nh,cap_de_setmana:i.cap!=null?Math.round(i.cap):null,n:i.nc,ara:Math.round(i.m)}]))};
-  const nom=`ronda_panoramica_${avui()}.json`,blob=new Blob([JSON.stringify(dades,null,1)],{type:'application/json'});
+  const nom=`${CC.fitxer}_${avui()}.json`,blob=new Blob([JSON.stringify(dades,null,1)],{type:'application/json'});
   const f=new File([blob],nom,{type:'application/json'});
-  try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Ronda al Panorámica'});return;}}
+  try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Ronda al '+CC.curt});return;}}
   catch(e){if(e.name==='AbortError') return;}
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
@@ -785,7 +806,7 @@ function ventAuto(){ventMa=null;desa(CLAU_VENT,null);document.getElementById('ve
 // ── cops, com al Golf Pad: a cada bola, un toc al pal amb què jugues des d'allà ──
 // La posició del cop és la del GPS (o la marcada amb ✋). El cop següent, o la bola al green, en tanca la distància;
 // amb el desnivell i el vent del moment, en surt l'equivalent en pla i sense vent, que ajusta la distància del pal.
-const CLAU_RONDA='pano-caddie-rondes';
+const CLAU_RONDA=K('pano-caddie-rondes');
 // cada forat: la llista de cops en ordre, com al Golf Pad. Cada cop és un pal, Sand (des del búnquer), Rough, Chip,
 // Putt o Penalty; tots compten un cop. Només els cops de pal ajusten la distància del pal. «Guardar» tanca el forat i passa al següent.
 let rondes=llegeix(CLAU_RONDA,{});                    // {data: {forat: {cops:[{pal,p,t,w,no,si,dm}], tancat}}}
@@ -900,18 +921,18 @@ function pintaPals(){
 }
 
 // ── plànol sense cobertura: les rajoles de l'ortofoto, a una memòria pròpia que no s'esborra en actualitzar l'app ──
-const CAU_RAJOLES='pano-rajoles-v1';
+const CAU_RAJOLES=CC.cau;
 async function estatPlanol(){
   const bt=document.getElementById('bt-planol');
-  try{const ll_=await (await fetch('rajoles/llista.json')).json(),c=await caches.open(CAU_RAJOLES),k=await c.keys();
+  try{const ll_=await (await fetch(RAJOLES.dir+'/llista.json')).json(),c=await caches.open(CAU_RAJOLES),k=await c.keys();
     bt.textContent=k.length>=ll_.n?'✅ Plànol desat al mòbil':`📥 Desa el plànol al mòbil (${String(ll_.mb).replace(".",",")} MB)`;}catch(e){}
 }
 async function desaPlanol(){
   const bt=document.getElementById('bt-planol');
   try{
-    const ll_=await (await fetch('rajoles/llista.json',{cache:'no-store'})).json(),c=await caches.open(CAU_RAJOLES);
+    const ll_=await (await fetch(RAJOLES.dir+'/llista.json',{cache:'no-store'})).json(),c=await caches.open(CAU_RAJOLES);
     let fet=0,err=0;const cua=[...ll_.f];
-    async function feina(){while(cua.length){const f=cua.shift(),u='rajoles/'+f;
+    async function feina(){while(cua.length){const f=cua.shift(),u=RAJOLES.dir+'/'+f;
       try{if(!(await c.match(u))){const r=await fetch(u);if(r.ok) await c.put(u,r);else err++;}}catch(e){err++;}
       fet++;if(fet%20===0) bt.textContent=`Desant… ${Math.round(100*fet/ll_.n)} %`;}}
     await Promise.all([feina(),feina(),feina(),feina()]);
@@ -960,7 +981,7 @@ function pintaAvisTee(){const n=teeAltre(),el=document.getElementById('avis-tee'
 // Normal: seguiment continu, però la pantalla només es repinta si t'has mogut 3 m o més.
 // Estalvi (🔋): sense seguiment continu; la posició es demana en obrir la pantalla, en tocar un pal i amb «📍»,
 // i la pantalla no es manté encesa.
-const CLAU_ESTALVI='pano-caddie-estalvi';
+const CLAU_ESTALVI=K('pano-caddie-estalvi');
 let estalvi=llegeix(CLAU_ESTALVI,false), vigila=null, ultPinta=null;
 function novaPos(pos,forca){
   if(ma) return;
@@ -993,6 +1014,8 @@ function toggleEstalvi(){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&estalvi) posicioAra();});
 engegaGPS();
 const q=new URLSearchParams(location.search);if(q.get('forat')){cfg.forat=Math.min(18,Math.max(1,+q.get('forat')));}
+// als altres camps, la font del desnivell és la de les seves dades
+if(CAMP_ID!=='panoramica'&&PC.font) document.getElementById('font-desn').textContent=`del model del terreny del camp (${PC.font})`;
 pinta(true);carregaPrevisio();estatPlanol();pintaUrlClaude();
 // versió de l'app (la del service worker) i si el mapa es pot girar en aquest mòbil
 (async()=>{let v='?';try{v=(await caches.keys()).find(k=>k.startsWith('golf-stats-'))||'?';}catch(e){}
@@ -1001,10 +1024,10 @@ pinta(true);carregaPrevisio();estatPlanol();pintaUrlClaude();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=46',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
 async function actualitza(){
   try{for(const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
-    for(const k of await caches.keys()) if(!k.startsWith('pano-rajoles')) await caches.delete(k);}catch(e){}
+    for(const k of await caches.keys()) if(!/-rajoles-v\d+$/.test(k)) await caches.delete(k);}catch(e){}
   location.reload();
 }
-try{if(!banderesDia.data&&!sessionStorage.getItem('pano-band-ara-no')) obreBanderes();}catch(e){}
+try{if(TE_ZONES&&!banderesDia.data&&!sessionStorage.getItem(K('pano-band-ara-no'))) obreBanderes();}catch(e){}
 // la previsió es refà cada 30 min (i al cap de 20 s si la primera no ha arribat)
 setTimeout(()=>{if(!previsio) carregaPrevisio();},20000);setInterval(carregaPrevisio,30*60e3);
 </script>
