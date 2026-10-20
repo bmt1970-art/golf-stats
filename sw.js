@@ -1,5 +1,5 @@
-const CACHE = 'golf-stats-v110';
-const FILES = ['./data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './manifest.json', './putt.webmanifest'];
+const CACHE = 'golf-stats-v111';
+const FILES = ['./index.html', './caddie.html', './putt.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './pano_caddie.js', './manifest.json', './putt.webmanifest'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
@@ -13,19 +13,16 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // index.html sempre des de xarxa (network-first) per evitar cache vella
-  if (url.pathname === '/' || url.pathname.endsWith('/index.html')) {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match('./index.html'))
-    );
-    return;
-  }
-  // putt.html i caddie.html: tambe des de xarxa, pero se'n desa copia per poder-les obrir sense cobertura al camp
-  const pag = ['putt.html', 'caddie.html'].find(f => url.pathname.endsWith('/' + f));
+  // pàgines (index.html, putt.html i caddie.html): des de xarxa per no quedar-se amb una versió vella, però se'n desa
+  // còpia per poder-les obrir sense cobertura al camp. L'iPhone demana l'inici com a '/golf-stats/' o '/golf-stats/index.html'
+  const pag = url.origin === location.origin && (url.pathname.endsWith('/') ? 'index.html'
+    : ['index.html', 'putt.html', 'caddie.html'].find(f => url.pathname.endsWith('/' + f)));
   if (pag) {
     e.respondWith(
-      fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(k => k.put('./' + pag, c)); return r; })
-        .catch(() => caches.match('./' + pag))
+      fetch(e.request).then(r => {
+        if (r.ok && !r.redirected) { const c = r.clone(); e.waitUntil(caches.open(CACHE).then(k => k.put('./' + pag, c))); }
+        return r;
+      }).catch(() => caches.match('./' + pag))
     );
     return;
   }

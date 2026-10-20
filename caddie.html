@@ -103,6 +103,7 @@ h3{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;
   <div class="cop" id="banderes-dia" style="display:none;margin:0 0 8px">🚩 <b>Posició de les banderes d'avui</b> (la de la targeta, per a tots els greens):
     <div class="fila"><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(1)">1</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(2)">2</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(3)">3</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(4)">4</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(5)">5</button><button class="xip" style="min-width:48px;font-size:18px" onclick="desaPosicio(6)">6</button></div>
     <div class="fila"><button class="bt" onclick="desaPosicio(null)">No ho sé</button><button class="bt" onclick="amagaBanderes()">Ara no</button></div></div>
+  <div id="avis-tee"></div>
   <div class="estat"><span id="gps">Buscant GPS…</span><span id="desn"></span></div>
   <div class="dist">
     <div class="tres">
@@ -311,7 +312,7 @@ function txtRisc(x){if(!x) return '';const t=[];if(x.b>=0.05) t.push(`${pct(x.b)
 
 // ── estat ──
 let cfg=llegeix(CLAU_CFG,{forat:1,barra:'groc'});
-let jo=null, precisio=null, ma=false, objectiu=null;
+let jo=null, precisio=null, joT=0, ma=false, objectiu=null;
 const forat=()=>String(cfg.forat);
 const H=()=>GEO[forat()], HP=()=>PC.holes[forat()];
 // lluny del camp (a més d'1,5 km del green del forat), les distàncies es donen des de les barres i no des d'on ets
@@ -417,9 +418,17 @@ function laser(){
 // banderes: a l'inici de la ronda, la posició del dia (1-6, la mateixa a tots els greens). Si a un forat no hi és:
 // una altra zona només per a aquell forat, o un canvi de posició des d'aquell forat (l'han mogut a mitja ronda),
 // o la bandera posada a mà al mapa si no és a cap zona
-const CLAU_BAND='pano-caddie-banderes-v2', avui=()=>new Date().toISOString().slice(0,10);
+// el dia és el del rellotge del mòbil (no el d'UTC, que a la una de la matinada encara és el dia anterior)
+const diaLocal=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const CLAU_BAND='pano-caddie-banderes-v2', avui=()=>diaLocal(Date.now());
 let banderesDia=llegeix(CLAU_BAND,{data:null,pos:null,canvis:[],z:{},man:{}});
 if(banderesDia.data!==avui()) banderesDia={data:null,pos:null,canvis:[],z:{},man:{}};
+// si la pàgina queda oberta d'un dia a l'altre, en tornar-hi les banderes i el làser d'ahir ja no valen
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'||!banderesDia.data||banderesDia.data===avui()) return;
+  banderesDia={data:null,pos:null,canvis:[],z:{},man:{}};Object.keys(bandera).forEach(n=>delete bandera[n]);
+  try{sessionStorage.removeItem('pano-band-ara-no');}catch(e){}
+  obreBanderes();pinta();});
 const desaBand=()=>{banderesDia.data=avui();desa(CLAU_BAND,banderesDia);};
 // la posició vigent en un forat: la del dia, o la del darrer canvi fet en aquell forat o abans
 function posicioDe(n){let p=banderesDia.pos;(banderesDia.canvis||[]).forEach(c=>{if(n>=c.des) p=c.pos;});return p;}
@@ -432,7 +441,11 @@ function triaZona(z){delete banderesDia.man[cfg.forat];
   if(z===posicioDe(cfg.forat)) delete banderesDia.z[cfg.forat]; else banderesDia.z[cfg.forat]=z;desaBand();pinta();}
 function obreBanderes(){const el=document.getElementById('banderes-dia');el.style.display='';el.scrollIntoView({block:'nearest'});}
 function amagaBanderes(){document.getElementById('banderes-dia').style.display='none';try{sessionStorage.setItem('pano-band-ara-no','1');}catch(e){}}
-function desaPosicio(z){banderesDia={data:avui(),pos:z,canvis:[],z:{},man:{}};desaBand();
+// la posició general (i els canvis a mitja ronda) es tria de nou; el que s'ha vist forat per forat es conserva:
+// el full de banderes, les marcades al mapa i les zones d'un sol forat (menys les que ara ja coincideixen amb la general)
+function desaPosicio(z){
+  const zs={};Object.entries(banderesDia.z||{}).forEach(([n,x])=>{if(x!==z) zs[n]=x;});
+  banderesDia={data:avui(),pos:z,canvis:[],z:zs,man:banderesDia.man||{},exacta:banderesDia.exacta||{}};desaBand();
   document.getElementById('banderes-dia').style.display='none';pinta();}
 let posantBandera=false;
 function posaBanderaMa(){posantBandera=!posantBandera;document.getElementById('bt-posa').classList.toggle('on',posantBandera);
@@ -487,6 +500,15 @@ function desaFullBanderes(){
 }
 function esborraFullBanderes(){banderesDia.exacta={};desaBand();obreFullBanderes();pinta();}
 
+// el punt de la vora del green a D m d'o (talls del cercle amb el contorn) més a prop de la referència
+function voraA(n,o,D,ref){
+  const xy=q=>[(q[1]-o[1])*DEM.k[0],(q[0]-o[0])*DEM.k[1]],C=(GEO[n].green.contour||[]).map(xy),R=xy(ref);let millor=null;
+  for(let i=0,j=C.length-1;i<C.length;j=i++){const a=C[j],b=C[i],ex=b[0]-a[0],ey=b[1]-a[1];
+    const A=ex*ex+ey*ey,B=2*(a[0]*ex+a[1]*ey),Cc=a[0]*a[0]+a[1]*a[1]-D*D,disc=B*B-4*A*Cc;if(!A||disc<0) continue;
+    [(-B-Math.sqrt(disc))/(2*A),(-B+Math.sqrt(disc))/(2*A)].forEach(s=>{if(s<0||s>1) return;
+      const P=[a[0]+s*ex,a[1]+s*ey],dd=Math.hypot(P[0]-R[0],P[1]-R[1]);if(!millor||dd<millor[0]) millor=[dd,P];});}
+  return millor?[o[0]+millor[1][1]/DEM.k[1],o[1]+millor[1][0]/DEM.k[0]]:null;
+}
 // la bandera d'un forat: la del làser; si no, la posada a mà; si no, la del full de banderes; si no, el centre de la zona
 function banderaDe(n){
   const man=banderesDia.man[n],z=zonaDe(n),pol=z&&PC.holes[n].zones&&PC.holes[n].zones[z];
@@ -494,9 +516,15 @@ function banderaDe(n){
   const ref=man?{p:man,font:'marcada al mapa'}:pe?{p:pe,font:textPos(exa),exacta:true}:pol?{p:centroide(pol),font:'zona '+z,z}:null;
   if(bandera[n]){
     // la distància del làser, en la direcció de la referència (o del centre del green si no n'hi ha)
-    const b=bandera[n],dir=ref?ref.p:ll(GEO[n].green.middle),p=puntA(b.o,b.D,rumb(b.o,dir)),g=GEO[n].green;
-    return{p,D:b.D,o:b.o,dins:!g.contour||dinsPol(p,g.contour),laser:true,
-      font:'làser'+(ref?', direcció '+(man?'de la marca':ref.exacta?'de '+ref.font:'de la zona '+z):', direcció del centre')};
+    const b=bandera[n],g=GEO[n].green,cg=ll(g.middle),dir=ref?ref.p:cg;
+    let p=puntA(b.o,b.D,rumb(b.o,dir)),dins=!g.contour||dinsPol(p,g.contour),ajust='';
+    // la distància del làser és bona; si en aquella direcció cau fora del green, la direcció suposada no ho és:
+    // es prova la del centre del green i, si tampoc, el punt de la vora del green a aquella distància més a prop de la referència
+    if(!dins&&ref){const q=puntA(b.o,b.D,rumb(b.o,cg));if(dinsPol(q,g.contour)){p=q;dins=true;ajust='del centre';}}
+    if(!dins){const q=voraA(n,b.o,b.D,dir);if(q){p=q;dins=true;ajust='de la vora del green';}}
+    return{p,D:b.D,o:b.o,dins,ajust:!!ajust,laser:true,
+      font:'làser'+(ajust?', direcció '+ajust+' (la '+(ref?(man?'de la marca':ref.exacta?'de '+ref.font:'de la zona '+z):'del centre')+' queia fora)'
+        :ref?', direcció '+(man?'de la marca':ref.exacta?'de '+ref.font:'de la zona '+z):', direcció del centre')};
   }
   return ref?{...ref,dins:true}:null;
 }
@@ -514,9 +542,9 @@ function textRonda(){
   Object.keys(ro).map(Number).sort((a,b)=>a-b).forEach(n=>{const f=ro[n];if(!f.cops.length&&f.putts==null) return;
     L.push(`Forat ${n} (par ${PC.holes[n].par}): `+copsDe(f).map(k=>`${nomPal(k.pal)}${k.d!=null?' '+m(k.d)+' m'+(Math.abs(k.dz)>=1?` (${signe(k.dz)} m)`:''):''}${k.no?' [no compta]':''}`).join(', ')
       +(f.tancat||f.putts!=null?` → ${copsForat(n)} cops`:' · en joc'));});
-  const ara=Date.now(),meus=cops.filter(k=>ara-k.t<4*86400e3);
+  const meus=cops.filter(copRecent);
   if(meus.length){L.push('Cops entrats a mà (pal, metres, desnivell, vent al llarg, equivalent en pla i sense vent):');
-    meus.forEach(k=>L.push(`- ${new Date(k.t).toLocaleDateString('ca-ES')} forat ${k.forat}: ${nomPal(k.pal)} ${k.d} m, ${signe(k.dz)} m, vent ${k.al} m/s, eq. ${k.eq} m${k.ma?' (entrat a mà)':''}`));}
+    meus.forEach(k=>L.push(`- ${new Date(k.t).toLocaleDateString('ca-ES')} forat ${k.forat}: ${nomPal(k.pal)} ${k.d} m, ${signe(k.dz)} m, vent ${k.al} m/s, eq. ${k.eq} m${k.ma?' (entrat a mà)':''}${compta(k)?'':' [no compta]'}`));}
   L.push('Distàncies dels pals ara (historial · cap de setmana · combinada): '+distPals().map(([c,i])=>`${nomPal(c)} ${m(i.hist)}·${i.nc?m(i.cap)+'('+i.nc+')':'-'}·${m(i.m)}`).join(', '));
   return L.join('\n');
 }
@@ -597,7 +625,7 @@ function pintaLaser(){
   document.getElementById('band-txt').innerHTML=banderesDia.man[cfg.forat]?'<b>posada a mà</b>':exf?`<b>${textPos(exf)}</b> (full de banderes)`:zs?`<b>zona ${zs}</b>`+(zs!==pd?` (avui la ${pd||'?'})`:''):'sense posició: tria la zona o posa-la al mapa';
   document.getElementById('zones-xips').innerHTML=hz?[1,2,3,4,5,6].map(z=>`<button class="xip${zs===z?' on':''}" onclick="triaZona(${z})">${z}</button>`).join(''):'';
   // si el làser la troba en una altra zona, potser l'han canviada
-  const bl=bandera[cfg.forat]?banderaDe(cfg.forat):null,zl=bl&&bl.dins?zonaDelPunt(cfg.forat,bl.p):null,av=document.getElementById('avis-zona');
+  const bl=bandera[cfg.forat]?banderaDe(cfg.forat):null,zl=bl&&bl.dins&&!bl.ajust?zonaDelPunt(cfg.forat,bl.p):null,av=document.getElementById('avis-zona');
   av.innerHTML=zl&&zs&&zl!==zs?`<div class="nota" style="color:#ffb4a6;font-size:13px">El làser la situa a la zona ${zl}, no a la ${zs}. L'han canviada?</div>
     <div class="fila"><button class="bt" onclick="canviZona(${zl},false)">Només aquest forat</button>
     <button class="bt" onclick="canviZona(${zl},true)">Posició ${zl} des d'aquest forat</button></div>`
@@ -612,7 +640,8 @@ function pintaLaser(){
   el.innerHTML=`<div><span class="n">Bandera (${b.font})${moguda?" des d'on ets ara":''}</span><span class="v">${m(D)} m<small>juga ${m(j)} · ${r?nomPal(r.c):''}</small></span></div>`
     +(b.dins&&g.front?`<div><span class="n">A l'entrada / al fons del green</span><span class="v">${m(dist(ll(g.front),b.p))} / ${g.back?m(dist(b.p,ll(g.back))):'–'} m</span></div>`:'')
     +(dzc!=null?`<div><span class="n">Bandera respecte del centre del green</span><span class="v">${signe(dzc*100)} cm</span></div>`:'')
-    +(b.dins?'':'<div><span class="n av">No cau dins del green: comprova la lectura</span></div>');
+    +(b.dins?'':'<div><span class="n av">No cau dins del green: comprova la lectura</span></div>')
+    +(b.ajust?'<div><span class="n av">En la direcció suposada queia fora del green: l\'he posada a dins. Comprova-ho o marca-la al mapa</span></div>':'');
 }
 let capaRisc=null;
 function elipse(x){const pts=[];for(let a=0;a<=360;a+=12){const al=2*Math.cos(a*rad)*x.sdL,tr=2*Math.sin(a*rad)*x.sdT+x.deriva;   // 2 desviacions: hi cau el 86 % dels cops
@@ -721,7 +750,7 @@ function pinta(centra){
   document.getElementById('obstacles').innerHTML=files.length?files.map(([d,n,a])=>
     `<div><span class="n">${n}</span><span class="v">${m(d)} m${Math.abs(a.j-a.d)>=1?`<small>juga ${m(a.j)}</small>`:''}</span></div>`).join('')
     :'<div><span class="n">Res per davant fins al green</span></div>';
-  pintaCop();pintaPals();pintaLaser();pintaDeixa();dibuixaForat(centra);dibuixaJo();if(centra) dibuixaDesn();
+  pintaAvisTee();pintaCop();pintaPals();pintaLaser();pintaDeixa();dibuixaForat(centra);dibuixaJo();if(centra) dibuixaDesn();
 }
 
 // ── vent a mà ──
@@ -769,15 +798,27 @@ function copsDe(f){
 // almenys el 75 % del que fa el pal (un approach a mig swing no ha d'escurçar el pal); amb ✓ es força
 const parcial=k=>k.d!=null&&HIST[k.pal]&&k.eq<0.75*HIST[k.pal].m;
 const compta=k=>!!HIST[k.pal]&&k.d!=null&&k.d>=15&&!k.no&&(k.si||!parcial(k));
-// tots els cops que compten per als pals: els entrats a mà i els de les rondes dels darrers 4 dies
+// tots els cops que compten per als pals, dels darrers 4 dies: els entrats a mà i els de les rondes, amb el mateix
+// criteri (cop sencer, o forçat amb ✓; fora els marcats ⊘)
+const copRecent=k=>Date.now()-k.t<4*86400e3;
 function totsCops(){
-  const r=cops.slice(),lim=new Date(Date.now()-4*86400e3).toISOString().slice(0,10);
+  const r=cops.filter(k=>copRecent(k)&&compta(k)),lim=diaLocal(Date.now()-4*86400e3);
   Object.entries(rondes).forEach(([data,ro])=>{if(data<lim) return;
     Object.entries(ro).forEach(([n,f])=>copsDe(f).forEach(k=>{if(compta(k)) r.push({t:k.t,forat:+n,pal:k.pal,d:k.d,dz:k.dz,al:k.al,eq:k.eq});}));});
   return r;
 }
 function pega(pal){
-  if(estalvi&&!ma&&pal!=='PENALTY'&&!pega.fet){pega.fet=true;posicioAra(()=>{pega(pal);pega.fet=false;});return;}
+  // en estalvi (o si la darrera lectura del GPS té més d'un minut) primer es demana la posició; si no arriba, el cop no es desa
+  if(!ma&&pal!=='PENALTY'&&!pega.fet&&(estalvi||(jo&&precisio!=null&&Date.now()-joT>60e3))){pega.fet=true;
+    posicioAra(()=>{pega(pal);pega.fet=false;},()=>{pega.fet=false;
+      alert(`No tinc la posició: el cop amb ${nomPal(pal)} no s'ha desat.
+Torna a tocar el pal quan respongui el GPS, o toca ✋, marca on ets al mapa i torna a tocar el pal.`);});
+    return;}
+  // al tee d'un altre forat amb aquest sense guardar: potser no has tocat «Guardar»
+  const nt=pal!=='PENALTY'&&teeAltre();
+  if(nt){if(confirm(`Ets al tee del forat ${nt} i el ${cfg.forat} no està guardat.
+El guardo amb ${nCops(foratR(cfg.forat).cops.length)} i aquest cop va al ${nt}?`)) passaAlTee(nt);
+    else{avisTeeNo=cfg.forat+'-'+nt;pintaAvisTee();}}
   const f=foratR(cfg.forat);
   if(pal==='PENALTY'){const ult=[...f.cops].reverse().find(k=>k.p);f.cops.push({pal,p:jo?jo.slice():ult?ult.p:null,t:Date.now(),w:ventAra()});}
   else{if(!jo){alert('Sense posició: activa el GPS o marca on ets amb ✋.');return;}
@@ -801,6 +842,7 @@ function metresCop(i){const f=foratR(cfg.forat),k=copsDe(f)[i];if(k.d==null) ret
 const copsForat=n=>{const f=(rondes[avui()]||{})[n];return f?f.cops.length+(f.putts||0)+(f.pen||0):0;};
 function pintaCop(){
   const el=document.getElementById('cop'),f=(rondes[avui()]||{})[cfg.forat]||{cops:[]},ks=copsDe(f),ps=distPals();
+  const mans=cops.map((k,i)=>[k,i]).filter(([k])=>k.forat===cfg.forat&&diaLocal(k.t)===avui());
   const fila=(k,i)=>{const dm=k.dm||null,d=dm||k.d,club=!!HIST[k.pal],c=compta(k);
     return `<div><span class="n">${i+1}. <b>${nomPal(k.pal)}</b>${club&&d!=null&&!c?(k.no?' <i>(no compta)</i>':' <i>(parcial, no compta)</i>'):''}</span><span class="v">${d!=null?m(d)+' m':k.pal==='PENALTY'||(f.tancat&&i===ks.length-1)?'':'…'}`
       +(club&&d!=null&&Math.abs(k.eq-k.d)>=1&&!dm?`<small>en pla ${m(k.eq)}</small>`:'')+`
@@ -808,6 +850,10 @@ function pintaCop(){
       ${club&&d!=null?`<button class="xip" style="min-width:30px;padding:3px 6px" onclick="metresCop(${i})" title="Corregeix els metres">✎</button>`:''}</span></div>`;};
   el.innerHTML=(ks.length?`<div class="llista">${ks.map(fila).join('')}</div>`:'<div class="nota" style="margin:0 0 4px">A cada bola, toca el pal amb què jugues des d\'allà: es desa la posició.</div>')
     +(f.tancat?'<div class="nota">✅ Forat guardat.</div>':'')
+    +(mans.length?`<div class="nota" style="margin:6px 0 2px">Entrats sense GPS:</div><div class="llista">${mans.map(([k,i])=>{const c=compta(k);
+      return `<div><span class="n"><b>${nomPal(k.pal)}</b>${c?'':k.no?' <i>(no compta)</i>':' <i>(parcial, no compta)</i>'}</span><span class="v">${m(k.d)} m
+      <button class="xip" style="min-width:30px;padding:3px 6px" onclick="noComptaMa(${i})" title="Compta o no per a la distància del pal">${c?'⊘':'✓'}</button>
+      <button class="xip" style="min-width:30px;padding:3px 6px" onclick="treuCopMa(${i})" title="Esborra el cop">✕</button></span></div>`;}).join('')}</div>`:'')
     +`<div class="fila">${ps.map(([c])=>`<button class="xip" onclick="pega('${c}')">${nomPal(c)}</button>`).join('')}</div>
     <div class="fila"><button class="xip" onclick="pega('SAND')">Sand</button><button class="xip" onclick="pega('ROUGH')">Rough</button>
       <button class="xip" onclick="pega('CHIP')">Chip</button><button class="xip" onclick="pega('PUTT')">Putt</button><button class="xip" onclick="pega('PENALTY')">Penalty</button>
@@ -825,6 +871,8 @@ function copAMa(){
   const d=+document.getElementById('cop-ma').value,pal=document.getElementById('cop-pal').value;if(!pal||!(d>0)) return;
   cops.push({t:Date.now(),forat:cfg.forat,pal,d,dz:0,al:0,eq:d,ma:1});desa(CLAU_COPS,cops);pinta();
 }
+function noComptaMa(i){const k=cops[i];if(compta(k)){k.no=true;k.si=false;}else{k.no=false;k.si=true;}desa(CLAU_COPS,cops);pinta();}
+function treuCopMa(i){cops.splice(i,1);desa(CLAU_COPS,cops);pinta();}
 function esborraCops(){if(confirm('Esborro els cops entrats a mà i les rondes desades en aquest mòbil?')){cops=[];rondes={};desa(CLAU_COPS,cops);desaRonda();pinta();}}
 // pantalla sempre encesa mentre jugues (si el mòbil ho permet)
 let wake=null;
@@ -880,11 +928,20 @@ window.addEventListener('message',e=>{
 function canviaForat(d){cfg.forat=Math.min(18,Math.max(1,cfg.forat+d));objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}
 function triaBarra(b){cfg.barra=b;desa(CLAU_CFG,cfg);pinta();}
 function modeMa(){ma=!ma;if(!ma&&precisio==null) jo=null;pinta();}
-// en arribar a un tee d'un altre forat, el caddie hi passa sol
+// en arribar a un tee d'un altre forat, el caddie hi passa sol; si el forat on eres no està guardat, t'ho pregunta
 function foratPerTee(p){
   for(const [n,hp] of Object.entries(PC.holes)) for(const t of Object.values(hp.tees)) if(dist(p,t)<12) return +n;
   return null;
 }
+const nCops=k=>k+(k===1?' cop':' cops');
+let avisTeeNo=null;                                    // 'N-M': al tee del M has dit que encara jugaves el N
+function teeAltre(){if(!jo) return null;const n=foratPerTee(jo);
+  return n&&n!==cfg.forat&&foratEnJoc()&&avisTeeNo!==cfg.forat+'-'+n?n:null;}
+function passaAlTee(n){foratR(cfg.forat).tancat=true;desaRonda();cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);pinta(true);}
+function noPassis(n){avisTeeNo=cfg.forat+'-'+n;pintaAvisTee();}
+function pintaAvisTee(){const n=teeAltre(),el=document.getElementById('avis-tee');
+  el.innerHTML=n?`<div class="cop" style="margin:0 0 8px">⛳ Ets al tee del forat ${n} i el ${cfg.forat} no està guardat (${nCops(foratR(cfg.forat).cops.length)}).
+    <div class="fila"><button class="bt verd" onclick="passaAlTee(${n})">Guarda'l i passa al ${n}</button><button class="bt" onclick="noPassis(${n})">Encara jugo el ${cfg.forat}</button></div></div>`:'';}
 // ── GPS i bateria ──
 // Normal: seguiment continu, però la pantalla només es repinta si t'has mogut 3 m o més.
 // Estalvi (🔋): sense seguiment continu; la posició es demana en obrir la pantalla, en tocar un pal i amb «📍»,
@@ -895,8 +952,8 @@ function novaPos(pos,forca){
   if(ma) return;
   const p=[pos.coords.latitude,pos.coords.longitude],acc=pos.coords.accuracy;
   const mogut=!ultPinta||dist(ultPinta.p,p)>=3||Math.abs((ultPinta.acc||0)-acc)>=5;
-  jo=p;precisio=acc;
-  const n=foratPerTee(jo);
+  jo=p;precisio=acc;joT=Date.now();
+  const n=foratPerTee(jo);if(avisTeeNo&&avisTeeNo!==cfg.forat+'-'+n) avisTeeNo=null;   // has sortit d'aquell tee
   if(n&&n!==cfg.forat&&!foratEnJoc()){cfg.forat=n;objectiu=null;desa(CLAU_CFG,cfg);ultPinta={p,acc};pinta(true);return;}
   if(mogut||forca){ultPinta={p,acc};pinta();}
 }
@@ -908,10 +965,11 @@ function engegaGPS(){
   else posicioAra();
 }
 // una sola lectura del GPS (mode estalvi): la més precisa que doni en uns segons
-function posicioAra(cb){
-  if(!navigator.geolocation){cb&&cb();return;}
+// cb, si arriba la posició; cbErr, si no (llavors no es fa servir la posició d'abans)
+function posicioAra(cb,cbErr){
+  if(!navigator.geolocation){errGPS();cbErr&&cbErr();return;}
   document.getElementById('gps').textContent='Buscant la posició…';
-  navigator.geolocation.getCurrentPosition(p=>{novaPos(p,true);cb&&cb();},()=>{errGPS();cb&&cb();},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+  navigator.geolocation.getCurrentPosition(p=>{novaPos(p,true);cb&&cb();},()=>{errGPS();cbErr&&cbErr();},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
 }
 function toggleEstalvi(){
   estalvi=!estalvi;desa(CLAU_ESTALVI,estalvi);
@@ -925,6 +983,8 @@ pinta(true);carregaPrevisio();estatPlanol();pintaUrlClaude();
 // versió de l'app (la del service worker) i si el mapa es pot girar en aquest mòbil
 (async()=>{let v='?';try{v=(await caches.keys()).find(k=>k.startsWith('golf-stats-'))||'?';}catch(e){}
   document.getElementById('versio').textContent=`${v.replace('golf-stats-','')} · mapa ${GIR?'girat':'sense gir'}`;})();
+// el service worker (la còpia per jugar sense cobertura): el mateix registre que index.html, i també després de «Força actualització»
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=46',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
 async function actualitza(){
   try{for(const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
     for(const k of await caches.keys()) if(!k.startsWith('pano-rajoles')) await caches.delete(k);}catch(e){}

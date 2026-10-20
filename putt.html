@@ -216,7 +216,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
 <script src="putt_motor.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=46',{updateViaCache:'none'}).catch(()=>{});
 
 const A_PROP=120;            // m: si ets a menys d'aixo d'un green, s'obre sol
 const CANVI=35;              // m: si t'allunyes aixi del green obert i un altre es mes a prop, avisa
