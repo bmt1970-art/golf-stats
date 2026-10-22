@@ -1,8 +1,8 @@
-const CACHE = 'golf-stats-v116';
+const CACHE = 'golf-stats-v117';
 // camps amb caddie (caddie_camps.js): les seves dades van a la memòria, i les rajoles i la seva memòria es tracten a part
 importScripts('./caddie_camps.js');
 const CADDIES = Object.values(CADDIE_CAMPS);
-const FILES = ['./index.html', './caddie.html', './putt.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './caddie_camps.js', './manifest.json', './putt.webmanifest']
+const FILES = ['./index.html', './caddie.html', './putt.html', './data.js', './clubs.js', './scorecards.js', './full_courses.js', './gps_all.js', './course_geo.js', './green_relief.js', './green_surface.js', './flag_history.js', './putt_motor.js', './caddie_camps.js', './banderes_previstes.js', './manifest.json', './putt.webmanifest']
   .concat(CADDIES.map(c => './' + c.dades));
 
 self.addEventListener('install', e => {
