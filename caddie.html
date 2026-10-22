@@ -581,6 +581,7 @@ function banderaDe(n){
 // la ronda en text, per passar-la a Claude (l'app del mòbil) i analitzar-la o actualitzar el caddie
 function textRonda(){
   const L=[`Ronda al ${CC.titol}, ${new Date().toLocaleString('ca-ES')}. Barres ${cfg.barra}.`];
+  if(partidaTancada()) L.push(`Partida tancada a les ${new Date(tancada.t).toLocaleTimeString('ca-ES',{hour:'2-digit',minute:'2-digit'})}.`);
   const w=ventAra();if(w) L.push(`Vent: ${w.v.toFixed(1)} m/s del ${nomVent(w.d)} (${w.font}).`);
   if(banderesDia.data===avui()){
     L.push(`Posició de bandera del dia: ${banderesDia.pos||'no la sé'}`+((banderesDia.canvis||[]).length?'; canvis: '+banderesDia.canvis.map(c=>`des del forat ${c.des}, posició ${c.pos}`).join(', '):''));
@@ -740,7 +741,7 @@ function pinta(centra){
   const g=h.green, o=origen();
   document.getElementById('bt-estalvi').classList.toggle('on',estalvi);
   document.getElementById('bt-estalvi').textContent=estalvi?'🔋 Estalvi: activat':'🔋 Estalvi';
-  document.getElementById('gps').innerHTML=(estalvi?'<button class="bt" style="padding:2px 8px;margin-right:6px" onclick="posicioAra()">📍</button>':'')+(jo&&!aprop()?`<span class="av">Ets lluny del camp: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`
+  document.getElementById('gps').innerHTML=partidaTancada()?'🏁 Partida tancada · GPS aturat':(estalvi?'<button class="bt" style="padding:2px 8px;margin-right:6px" onclick="posicioAra()">📍</button>':'')+(jo&&!aprop()?`<span class="av">Ets lluny del camp: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`
     :jo?(precisio!=null?`GPS ±${m(precisio)} m${estalvi?' · estalvi':''}`:'Posició marcada a mà')
     :`<span class="av">Sense posició: distàncies des de les barres ${({blanc:'blanques',groc:'grogues',blau:'blaves',vermell:'vermelles'})[cfg.barra]}</span>`);
   // green
@@ -832,6 +833,13 @@ const rondaAvui=()=>(rondes[avui()]=rondes[avui()]||{});
 const foratR=n=>(rondaAvui()[n]=rondaAvui()[n]||{cops:[],tancat:false});
 const desaRonda=()=>desa(CLAU_RONDA,rondes);
 const foratEnJoc=()=>{const f=(rondes[avui()]||{})[cfg.forat];return !!(f&&f.cops.length&&!f.tancat);};
+// partida tancada («🏁 Tanca la partida»): aquell dia ja no s'hi entren cops; el GPS s'atura i la pantalla no es manté
+// encesa. «Reobre la partida» ho desfà, i l'endemà el caddie torna a començar sol. Clau nova: no en canvia cap d'abans.
+const CLAU_TANCA=K('pano-caddie-ronda-tancada');
+let tancada=llegeix(CLAU_TANCA,null);
+const partidaTancada=()=>!!(tancada&&tancada.data===avui());
+function resumRonda(){const fets=Object.keys(rondes[avui()]||{}).filter(n=>copsForat(n)>0);
+  const tot=fets.reduce((s,n)=>s+copsForat(n),0),pars=fets.reduce((s,n)=>s+PC.holes[n].par,0);return{tot,dif:tot-pars,n:fets.length};}
 // la distància de cada cop: fins a la posició del cop següent (les penalitzacions no tenen posició pròpia)
 function copsDe(f){
   const ks=f.cops;
@@ -859,6 +867,7 @@ function totsCops(){
   return r;
 }
 function pega(pal,ambPos){
+  if(partidaTancada()){alert('La partida és tancada. Si vols continuar, toca «Reobre la partida».');return;}
   // mentre es busca la posició d'un cop, un altre toc no desa res (es desaria amb la posició d'abans)
   if(pega.pendent){document.getElementById('gps').textContent=`Encara busco la posició del cop amb ${nomPal(pega.pendent)}…`;return;}
   // en estalvi (o si la darrera lectura del GPS té més d'un minut) primer es demana la posició; si no arriba, el cop no es desa
@@ -886,6 +895,18 @@ function guardaForat(){
   if(!f.cops.length){alert('Encara no hi ha cap cop en aquest forat.');return;}
   f.tancat=true;desaRonda();if(cfg.forat<18) canviaForat(1);else pinta();
 }
+// tancar la partida: guarda els forats que han quedat oberts, atura el GPS i deixa el resultat amb Comparteix i Exporta
+function tancaPartida(){
+  const r=resumRonda();if(!r.n){alert('Encara no hi ha cap forat jugat avui.');return;}
+  const oberts=Object.entries(rondes[avui()]||{}).filter(([n,f])=>f.cops.length&&!f.tancat).map(([n])=>n);
+  if(!confirm(`Tanco la partida d'avui? ${nCops(r.tot)} (${resPar(r.dif)}) en ${r.n} forats.`
+    +(oberts.length?`\nEs guarda${oberts.length>1?'n els forats '+oberts.join(', '):' el forat '+oberts[0]}, que no ${oberts.length>1?'estaven guardats':'estava guardat'}.`:'')
+    +'\nS\'atura el GPS. Si cal, després la pots reobrir.')) return;
+  oberts.forEach(n=>{rondes[avui()][n].tancat=true;});desaRonda();
+  tancada={data:avui(),t:Date.now()};desa(CLAU_TANCA,tancada);
+  aturaGPS();pinta();
+}
+function reobrePartida(){tancada=null;desa(CLAU_TANCA,null);engegaGPS();encen();pinta();}
 // ⊘ / ✓: canvia si el cop compta per a la distància del pal
 function noCompta(i){const f=foratR(cfg.forat),k=f.cops[i],ara=compta(copsDe(f)[i]);
   if(ara){k.no=true;k.si=false;}else{k.no=false;k.si=true;}desaRonda();pinta();}
@@ -895,6 +916,11 @@ function metresCop(i){const f=foratR(cfg.forat),k=copsDe(f)[i];if(k.d==null) ret
 const copsForat=(n,data=avui())=>{const f=(rondes[data]||{})[n];return f?f.cops.length+(f.putts||0)+(f.pen||0):0;};
 function pintaCop(){
   const el=document.getElementById('cop'),f=(rondes[avui()]||{})[cfg.forat]||{cops:[]},ks=copsDe(f),ps=distPals();
+  if(partidaTancada()){const r=resumRonda(),h=new Date(tancada.t).toLocaleTimeString('ca-ES',{hour:'2-digit',minute:'2-digit'});
+    el.innerHTML=`<div class="nota" style="margin:0 0 6px;color:var(--txt)">🏁 Partida tancada a les ${h}: <b>${nCops(r.tot)}</b> (${resPar(r.dif)}) en ${r.n} forats.</div>
+      <div class="fila"><button class="bt verd" onclick="comparteix()">📤 Comparteix la ronda</button><button class="bt" onclick="exportaRonda()">📦 Exporta la ronda</button>
+      <button class="bt" onclick="reobrePartida()">↩ Reobre la partida</button></div>`;
+    document.getElementById('desn').textContent+=` · Ronda ${r.tot} (${resPar(r.dif)}, ${r.n} forats)`;return;}
   const mans=cops.map((k,i)=>[k,i]).filter(([k])=>k.forat===cfg.forat&&diaLocal(k.t)===avui());
   const fila=(k,i)=>{const dm=k.dm||null,d=dm||k.d,club=!!HIST[k.pal],c=compta(k);
     return `<div><span class="n">${i+1}. <b>${nomPal(k.pal)}</b>${club&&d!=null&&!c?(k.no?' <i>(no compta)</i>':' <i>(parcial, no compta)</i>'):''}</span><span class="v">${d!=null?m(d)+' m':k.pal==='PENALTY'||(f.tancat&&i===ks.length-1)?'':'…'}`
@@ -911,6 +937,7 @@ function pintaCop(){
     <div class="fila"><button class="xip" onclick="pega('SAND')">Sand</button><button class="xip" onclick="pega('ROUGH')">Rough</button>
       <button class="xip" onclick="pega('CHIP')">Chip</button><button class="xip" onclick="pega('PUTT')">Putt</button><button class="xip" onclick="pega('PENALTY')">Penalty</button>
       <button class="xip" onclick="desfes()">↩ Desfer</button><button class="xip" style="background:#2e7d32" onclick="guardaForat()">💾 Guardar</button></div>
+    ${resumRonda().n?'<div class="fila" style="margin-top:10px"><button class="bt" onclick="tancaPartida()">🏁 Tanca la partida</button></div>':''}
     <div class="fila"><span class="nota" style="margin:8px 4px 0 0">Cop sense GPS: pal i metres</span>
       <select id="cop-pal" style="font:600 16px inherit;padding:6px;border-radius:8px">${ps.map(([c])=>`<option value="${c}">${nomPal(c)}</option>`).join('')}</select>
       <input id="cop-ma" type="number" inputmode="numeric" placeholder="m" style="width:70px;font:700 16px inherit;padding:6px;border-radius:8px;border:0">
@@ -1027,10 +1054,19 @@ function posicioAra(cb,cbErr){
 function toggleEstalvi(){
   estalvi=!estalvi;desa(CLAU_ESTALVI,estalvi);
   if(estalvi&&wake){try{wake.release();}catch(e){}wake=null;}
-  engegaGPS();pinta();
+  if(!partidaTancada()) engegaGPS();pinta();
 }
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&estalvi) posicioAra();});
-engegaGPS();
+// partida tancada: sense GPS ni pantalla encesa; les distàncies tornen a ser des de les barres
+function aturaGPS(){
+  if(vigila!=null&&navigator.geolocation){navigator.geolocation.clearWatch(vigila);vigila=null;}
+  if(wake){try{wake.release();}catch(e){}wake=null;}
+  jo=null;precisio=null;
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible') return;
+  // l'endemà d'una partida tancada, amb la pàgina oberta d'un dia per l'altre: es torna a començar
+  if(tancada&&!partidaTancada()){tancada=null;desa(CLAU_TANCA,null);engegaGPS();pinta();return;}
+  if(estalvi&&!partidaTancada()) posicioAra();});
+if(partidaTancada()) aturaGPS(); else engegaGPS();
 const q=new URLSearchParams(location.search);if(q.get('forat')){cfg.forat=Math.min(18,Math.max(1,+q.get('forat')));}
 // als altres camps, la font del desnivell és la de les seves dades
 if(CAMP_ID!=='panoramica'&&PC.font) document.getElementById('font-desn').textContent=`del model del terreny del camp (${PC.font})`;
