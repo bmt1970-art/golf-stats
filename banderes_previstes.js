@@ -5,7 +5,8 @@ const BANDERES_PREVISTES = {
  "panoramica": {
   "dies": [
    "2026-10-22",
-   "2026-10-23"
+   "2026-10-23",
+   "2026-10-24"
   ],
   "de": "22-10",
   "partida": "R2978GQ8",
