@@ -585,6 +585,14 @@ function banderaDe(n){
   }
   return ref?{...ref,dins:ref.exacta?dinsGreen(n,ref.p,1):true}:null;
 }
+// les banderes del dia de tots els forats, per a l'app de putt (hi posa el forat): localStorage golf-banderes-dia,
+// {<camp>: {data, forats{n: [lat,lon]}}}. Només les que cauen al green; es reescriu quan canvien.
+function compartBanderes(){
+  const forats={};
+  for(let n=1;n<=18;n++){if(!GEO[n]) continue;const b=banderaDe(n);if(b&&b.dins&&b.p) forats[n]=[+b.p[0].toFixed(7),+b.p[1].toFixed(7)];}
+  const v={data:avui(),forats},s=JSON.stringify(v);if(s===compartBanderes.ult) return;compartBanderes.ult=s;
+  try{const tot=JSON.parse(localStorage.getItem('golf-banderes-dia')||'{}');tot[CAMP]=v;localStorage.setItem('golf-banderes-dia',JSON.stringify(tot));}catch(e){}
+}
 // la ronda en text, per passar-la a Claude (l'app del mòbil) i analitzar-la o actualitzar el caddie
 function textRonda(){
   const L=[`Ronda al ${CC.titol}, ${new Date().toLocaleString('ca-ES')}. Barres ${cfg.barra}.`];
@@ -722,6 +730,7 @@ function dibuixaJo(){
   if(lObj){mapa.removeLayer(lObj);lObj=null;}
   if(jo) mJo=L.circleMarker(jo,{radius:8,color:'#fff',weight:3,fillColor:'#2196f3',fillOpacity:1}).addTo(mapa);
   if(mBand){mapa.removeLayer(mBand);mBand=null;}
+  compartBanderes();
   const b=banderaDe(cfg.forat);
   // la banderola dibuixada (no un emoji, que cada mòbil pinta d'una mida): el punt groc del peu del pal és la bandera
   if(b) mBand=L.marker(b.p,{icon:L.divIcon({className:'q-band',html:BANDEROLA,iconSize:[24,30],iconAnchor:[4,27]}),interactive:false}).addTo(mapa);

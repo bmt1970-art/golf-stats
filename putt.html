@@ -213,6 +213,7 @@ details.bloc summary{font-weight:700;font-size:15px;cursor:pointer}
 <script src="green_relief.js"></script>
 <script src="green_surface.js"></script>
 <script src="flag_history.js"></script>
+<script src="banderes_previstes.js"></script>
 <script src="putt_motor.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -275,20 +276,32 @@ function initMapa(){
   mapa.createPane('relleu').style.zIndex=350;
   mapa.on('click',e=>{ if(!actual) return; const p=estatDe(actual); p[modeAct]=[e.latlng.lat,e.latlng.lng];
     // un toc mou la bola; «Forat» serveix per a un sol toc i torna a la bola (com a index.html)
-    p.exemple=false; if(modeAct==='bola') p.gps=null; if(modeAct==='forat') mode('bola'); dibuixaPutt(); });
+    p.exemple=false; if(modeAct==='bola') p.gps=null; if(modeAct==='forat'){p.delDia=false;mode('bola');} dibuixaPutt(); });
 }
 
 function obre(g,auto){
   actual=g; avisat=null; amagaAvis(); tancaTria();
-  document.getElementById('nom').innerHTML=`${nomGreen(g.camp,g.n)}<small>${nomCamp(g.camp)}${auto?' · el més proper':''}</small>`;
   const p=estatDe(g);
+  document.getElementById('nom').innerHTML=`${nomGreen(g.camp,g.n)}<small>${nomCamp(g.camp)}${auto?' · el més proper':''}${p.delDia?' · forat a la bandera del dia':''}</small>`;
   if(posJo&&!p.fixada){ const S=puttSuperficie(g.camp,g.n); if(S&&puttDins(S,...puttEN(S,posJo))){p.bola=posJo.slice();p.gps=posJo.acc;p.exemple=false;} }
   dibuixaRelleu();
   mapa.fitBounds(g.contorn,{paddingTopLeft:[20,80],paddingBottomRight:[20,190],animate:false});
   dibuixaPutt();
 }
+// la bandera del dia, on comença el forat: la del caddie d'avui (golf-banderes-dia, la desa caddie.html) o, si avui
+// encara no s'ha obert, la prevista (banderes_previstes.js); si no n'hi ha, el centre del green, com sempre
+const diaLocal=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+function banderaDia(g){
+  const avui=diaLocal(Date.now());
+  try{const c=JSON.parse(localStorage.getItem('golf-banderes-dia')||'{}')[g.camp];
+    if(c&&c.data===avui&&c.forats&&c.forats[g.n]) return c.forats[g.n];}catch(e){}
+  if(typeof BANDERES_PREVISTES!=='undefined') for(const e of Object.values(BANDERES_PREVISTES))
+    if(e.camp===g.camp&&(e.dies||[]).includes(avui)&&e.punts&&e.punts[g.n]) return e.punts[g.n];
+  return null;
+}
 function estatDe(g){
-  if(!estat[g.clau]) estat[g.clau]={forat:[g.green.middle.lat,g.green.middle.lon],bola:puttBolaExemple(g.green),exemple:true};
+  if(!estat[g.clau]){const bd=banderaDia(g);
+    estat[g.clau]={forat:bd?bd.slice():[g.green.middle.lat,g.green.middle.lon],bola:puttBolaExemple(g.green),exemple:true,delDia:!!bd};}
   return estat[g.clau];
 }
 

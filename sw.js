@@ -1,4 +1,4 @@
-const CACHE = 'golf-stats-v120';
+const CACHE = 'golf-stats-v121';
 // camps amb caddie (caddie_camps.js): les seves dades van a la memòria, i les rajoles i la seva memòria es tracten a part
 importScripts('./caddie_camps.js');
 const CADDIES = Object.values(CADDIE_CAMPS);
